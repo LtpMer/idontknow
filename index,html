@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stick Fight: Online Physics Brawler</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- THREE.js for 3D/2D rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- CANNON.js for physics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, runTransaction, arrayRemove, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables for Firebase access (set up by the environment)
+        // Ensure these variables are globally available.
+        window.__app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        window.__firebase_config = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        window.__initial_auth_token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        window.FB = {
+            initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut,
+            getFirestore, doc, setDoc, onSnapshot, collection, query, runTransaction, setLogLevel, arrayRemove, arrayUnion, getDoc
+        };
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1f2937;
+            color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Hide scrollbars */
+        }
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        canvas {
+            display: block;
+            touch-action: none; /* Prevents touch scrolling on the canvas */
+        }
+        .ui-panel {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            z-index: 10;
+        }
+        .game-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 1rem;
+            z-index: 10;
+        }
+        .control-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .control-button {
+            padding: 0.75rem 1.25rem;
+            background-color: #f59e0b; /* Amber */
+            color: #1f2937;
+            font-weight: bold;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px #b45309;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .control-button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px #b45309;
+        }
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            color: white;
+            font-size: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- The THREE.js canvas will be injected here -->
+    <div class="loading-overlay" id="loading-overlay">
+        <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Connecting to the Arena...</span>
+    </div>
+
+    <div class="ui-panel">
+        <div class="text-lg font-bold">Stick Fight</div>
+        <div class="flex flex-col items-end">
+            <span id="map-info" class="text-sm font-semibold">Map 1/10</span>
+            <span id="player-id-display" class="text-xs text-gray-400">ID: N/A</span>
+        </div>
+    </div>
+
+    <div class="game-controls md:hidden">
+        <div class="control-group">
+            <button class="control-button" id="move-left">◀️</button>
+            <button class="control-button" id="move-right">▶️</button>
+        </div>
+        <div class="control-group">
+            <button class="control-button" id="jump-btn">⬆️ Jump</button>
+            <button class="control-button" id="attack-btn">⚔️ Attack</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Constants and Global State
+    const MAP_COUNT = 10;
+    const DESTRUCTION_IMPULSE_THRESHOLD = 5; // Impulse needed to break a block
+    const PLAYER_SPEED = 5;
+    const JUMP_VELOCITY = 10;
+    const APP_ID = window.__app_id;
+    const FIREBASE_CONFIG = window.__firebase_config;
+    const INITIAL_AUTH_TOKEN = window.__initial_auth_token;
+
+    // Firebase state
+    let db, auth;
+    let userId = null;
+    let isAuthReady = false;
+    let localPlayerId = null;
+
+    // Game state
+    let gameLoopRunning = false;
+    let activeMapIndex = 0;
+    let world;
+    let stickman;
+    let stickmanBody;
+    let weaponBody;
+
+    // THREE.js state
+    let scene, camera, renderer;
+    const playerObjects = {}; // Maps userId to { mesh, weaponMesh, bodyId }
+    const mapObjects = {}; // Maps mapBlockId to { mesh, body }
+    const materialCache = {}; // Cache materials for performance
+
+    // Input state
+    const keys = {
+        left: false, right: false, up: false, attack: false
+    };
+
+    /**
+     * Helper to create a unique block ID
+     * @param {number} x
+     * @param {number} y
+     * @param {number} mapIndex
+     */
+    function createBlockId(x, y, mapIndex) {
+        return `map_${mapIndex}_${x}_${y}`;
+    }
+
+    // --- Core Physics/Rendering Logic ---
+
+    /**
+     * Gets a cached THREE.js material by color.
+     * @param {number} hexColor - The color in hex format (e.g., 0xff0000).
+     * @returns {THREE.Material}
+     */
+    function getMaterial(hexColor) {
+        if (!materialCache[hexColor]) {
+            materialCache[hexColor] = new THREE.MeshLambertMaterial({ color: hexColor });
+        }
+        return materialCache[hexColor];
+    }
+
+    /**
+     * Initializes the Three.js scene, camera, and renderer.
+     */
+    function initThree() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x334155); // Slate background
+        camera = new THREE.OrthographicCamera(
+            window.innerWidth / -20, window.innerWidth / 20,
+            window.innerHeight / 20, window.innerHeight / -20,
+            0.1, 1000
+        );
+        camera.position.set(0, 5, 50);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('game-container').appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+
+        window.addEventListener('resize', onWindowResize);
+    }
+
+    /**
+     * Handles window resizing to keep the game responsive.
+     */
+    function onWindowResize() {
+        // Adjust Orthographic camera for aspect ratio change
+        const aspect = window.innerWidth / window.innerHeight;
+        const width = 40; // Fixed world width for orthographic view
+        camera.left = -width * aspect / 2;
+        camera.right = width * aspect / 2;
+        camera.top = width / 2;
+        camera.bottom = -width / 2;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    /**
+     * Creates and configures the Cannon.js physics world.
+     */
+    function initCannon() {
+        world = new CANNON.World();
+        world.gravity.set(0, -20, 0); // Increased gravity for snappier 2D platformer feel
+        world.broadphase = new CANNON.NaiveBroadphase();
+        world.solver.iterations = 10; // More iterations for stability
+
+        // Ground Material
+        const groundMaterial = new CANNON.Material("groundMaterial");
+        const slipperyMaterial = new CANNON.Material("slipperyMaterial");
+        const ground_slippery_contact = new CANNON.ContactMaterial(groundMaterial, slipperyMaterial, {
+            friction: 0.1,
+            restitution: 0.3
+        });
+        world.addContactMaterial(ground_slippery_contact);
+
+        // Create a massive ground plane (invisible) to catch things far below the screen
+        const planeShape = new CANNON.Plane();
+        const planeBody = new CANNON.Body({ mass: 0, material: groundMaterial });
+        planeBody.addShape(planeShape);
+        planeBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2); // Rotate to be flat on Y axis
+        planeBody.position.y = -50;
+        world.add(planeBody);
+    }
+
+    /**
+     * Generates one of the 10 possible map layouts.
+     * @param {number} index - Map index (0-9).
+     */
+    function generateMapLayout(index) {
+        // Clear existing map
+        Object.values(mapObjects).forEach(obj => {
+            scene.remove(obj.mesh);
+            world.remove(obj.body);
+        });
+        for (const key in mapObjects) { delete mapObjects[key]; }
+
+        const layout = [
+            // Map 1: Simple Platform
+            [{ x: 0, y: -5, w: 30, h: 2, c: 0x6b7280 }],
+            // Map 2: Split Platforms
+            [{ x: -10, y: -2, w: 10, h: 1, c: 0x9ca3af }, { x: 10, y: -2, w: 10, h: 1, c: 0x9ca3af }],
+            // Map 3: Tower
+            [{ x: 0, y: -5, w: 5, h: 2, c: 0x4b5563 }, { x: 0, y: 0, w: 5, h: 2, c: 0x4b5563 }, { x: 0, y: 5, w: 5, h: 2, c: 0x4b5563 }],
+            // Map 4: Bridge (Destructible)
+            [{ x: -15, y: -5, w: 5, h: 2, c: 0xef4444 }, { x: 0, y: -5, w: 20, h: 1, c: 0xfcd34d, destructible: true }, { x: 15, y: -5, w: 5, h: 2, c: 0xef4444 }],
+            // Map 5: Floating Islands
+            [{ x: -15, y: 0, w: 8, h: 1.5, c: 0x10b981 }, { x: 15, y: 0, w: 8, h: 1.5, c: 0x10b981 }],
+            // Map 6: Diagonal Ascent
+            [{ x: -10, y: -3, w: 8, h: 1, c: 0x3b82f6 }, { x: 0, y: 0, w: 8, h: 1, c: 0x3b82f6 }, { x: 10, y: 3, w: 8, h: 1, c: 0x3b82f6 }],
+            // Map 7: Boxed Center (Destructible Walls)
+            [{ x: 0, y: -5, w: 20, h: 1, c: 0x374151 }, { x: -10, y: 0, w: 1, h: 10, c: 0x374151, destructible: true }, { x: 10, y: 0, w: 1, h: 10, c: 0x374151, destructible: true }],
+            // Map 8: Small Floating Blocks (Destructible)
+            [{ x: -10, y: 0, w: 2, h: 2, c: 0xec4899, destructible: true }, { x: 0, y: 0, w: 2, h: 2, c: 0xec4899, destructible: true }, { x: 10, y: 0, w: 2, h: 2, c: 0xec4899, destructible: true }],
+            // Map 9: L-Shape
+            [{ x: -10, y: -5, w: 15, h: 2, c: 0x6d28d9 }, { x: -15, y: 0, w: 2, h: 10, c: 0x6d28d9 }],
+            // Map 10: The Pit
+            [{ x: -10, y: -5, w: 10, h: 2, c: 0x064e3b }, { x: 10, y: -5, w: 10, h: 2, c: 0x064e3b }],
+        ];
+
+        const mapConfig = layout[index % MAP_COUNT];
+
+        mapConfig.forEach(config => {
+            const { x, y, w, h, c, destructible = false } = config;
+            // Create physics body
+            const halfExtents = new CANNON.Vec3(w / 2, h / 2, 0.5); // Add a small Z depth
+            const boxShape = new CANNON.Box(halfExtents);
+            const body = new CANNON.Body({
+                mass: 0, // Static body
+                shape: boxShape,
+                position: new CANNON.Vec3(x, y, 0),
+                material: new CANNON.Material("groundMaterial")
+            });
+
+            // Create 3D mesh
+            const geometry = new THREE.BoxGeometry(w, h, 1); // Z=1 for visibility
+            const mesh = new THREE.Mesh(geometry, getMaterial(c));
+            mesh.position.copy(body.position);
+            mesh.quaternion.copy(body.quaternion);
+            scene.add(mesh);
+
+            const blockId = createBlockId(x, y, index);
+            mapObjects[blockId] = { mesh, body, destructible };
+            world.add(body);
+        });
+
+        // Update UI
+        document.getElementById('map-info').textContent = `Map ${index + 1}/${MAP_COUNT} (${mapConfig.filter(c => c.destructible).length > 0 ? 'Destructible' : 'Static'})`;
+    }
+
+    /**
+     * Creates the local player's stickman and weapon physics bodies.
+     */
+    function createLocalPlayer() {
+        if (stickmanBody) return; // Already exists
+
+        // Stickman Body (Cylinder for a cleaner look)
+        const radius = 0.5;
+        const height = 2.0;
+        const cylinderShape = new CANNON.Cylinder(radius, radius, height, 16);
+        stickmanBody = new CANNON.Body({
+            mass: 5,
+            shape: cylinderShape,
+            position: new CANNON.Vec3(0, 5, 0),
+            linearDamping: 0.9,
+            fixedRotation: true // Prevent rolling for easier control
+        });
+        stickmanBody.updateAABB(); // Update AABB after creation
+        world.add(stickmanBody);
+
+        // Weapon Body (a long, thin box)
+        const weaponHalfExtents = new CANNON.Vec3(0.5, 0.1, 0.1);
+        const weaponShape = new CANNON.Box(weaponHalfExtents);
+        weaponBody = new CANNON.Body({
+            mass: 1, // Light mass
+            shape: weaponShape,
+            linearDamping: 0.8,
+            angularDamping: 0.8,
+            collisionFilterGroup: 2, // Custom group
+            collisionFilterMask: 1 // Collides with default group (1)
+        });
+        world.add(weaponBody);
+
+        localPlayerId = userId;
+    }
+
+    /**
+     * Checks if the player is touching a surface below them.
+     */
+    function isPlayerGrounded() {
+        const body = stickmanBody;
+        if (!body) return false;
+
+        // Perform a small raycast/sphere sweep downwards
+        const ray = new CANNON.Ray(body.position, body.position.vadd(new CANNON.Vec3(0, -1.1, 0)));
+        ray.skipBackfaces = true;
+        const result = new CANNON.RaycastResult();
+        world.raycastAll(ray.from, ray.to, { skipBackfaces: true }, result);
+
+        // Check if any hit is close enough to be considered grounded
+        for (let i = 0; i < result.hasHit.length; i++) {
+             if (result.distance[i] < 0.1) return true;
+        }
+
+        // Simpler check using velocity and AABB for performance
+        if (body.velocity.y < 0.01 && body.position.y <= -3) { // A basic fallback near map floor level
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Applies the current player input to the local physics body.
+     */
+    function updateLocalPlayerPhysics() {
+        if (!stickmanBody || !weaponBody) return;
+
+        const grounded = isPlayerGrounded();
+
+        // 1. Movement
+        let velocityX = 0;
+        if (keys.left) velocityX -= PLAYER_SPEED;
+        if (keys.right) velocityX += PLAYER_SPEED;
+
+        // Apply force or set velocity directly
+        if (grounded) {
+            stickmanBody.velocity.x = velocityX;
+        } else {
+            // Air control (less effective)
+            stickmanBody.velocity.x += velocityX * 0.1;
+            stickmanBody.velocity.x = Math.max(Math.min(stickmanBody.velocity.x, PLAYER_SPEED), -PLAYER_SPEED);
+        }
+
+        // 2. Jump
+        if (keys.up && grounded) {
+            stickmanBody.velocity.y = JUMP_VELOCITY;
+            keys.up = false; // Consume jump
+        }
+
+        // 3. Weapon Control
+        // The weapon is attached to the player's position
+        let weaponPosition = stickmanBody.position.vadd(new CANNON.Vec3(0.5, 0, 0));
+        let weaponQuaternion = new CANNON.Quaternion();
+
+        if (keys.attack) {
+            // Apply a strong rotational force for a swing
+            weaponBody.angularVelocity.z = 100; // Fast rotation
+            weaponPosition = stickmanBody.position.vadd(new CANNON.Vec3(0, 1, 0)); // Move weapon up for swing arc
+            keys.attack = false; // Single swing
+        } else {
+            // Keep weapon loosely attached (carry position)
+            weaponBody.position.copy(weaponPosition);
+            weaponBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), Math.PI / 4);
+            weaponBody.velocity.copy(stickmanBody.velocity.vadd(new CANNON.Vec3(0, 0, 0))); // Follow player
+            weaponBody.angularVelocity.set(0, 0, 0);
+        }
+
+        // Check for weapon collision with destructible blocks
+        // The collision detection will happen in the `updateGameLoop`
+    }
+
+    // --- Firebase Synchronization ---
+
+    /**
+     * Pushes the local player's state (position, velocity, weapon state) to Firestore.
+     */
+    async function syncLocalPlayerToFirestore() {
+        if (!userId || !stickmanBody || !weaponBody) return;
+
+        const playerRef = FB.doc(db, "artifacts", APP_ID, "public/data/stick_fight_players", userId);
+
+        const state = {
+            x: stickmanBody.position.x,
+            y: stickmanBody.position.y,
+            vx: stickmanBody.velocity.x,
+            vy: stickmanBody.velocity.y,
+            wx: weaponBody.position.x,
+            wy: weaponBody.position.y,
+            wz: weaponBody.position.z,
+            wqx: weaponBody.quaternion.x,
+            wqy: weaponBody.quaternion.y,
+            wqz: weaponBody.quaternion.z,
+            wqw: weaponBody.quaternion.w,
+            mapIndex: activeMapIndex,
+            lastUpdate: FB.serverTimestamp(),
+            displayName: userId.substring(0, 8),
+            isAttacking: keys.attack
+        };
+
+        try {
+            await FB.setDoc(playerRef, state, { merge: true });
+        } catch (e) {
+            console.error("Error writing player state:", e);
+        }
+    }
+
+    /**
+     * Sets up a real-time listener for all players in the game.
+     */
+    function setupPlayerListener() {
+        const q = FB.collection(db, "artifacts", APP_ID, "public/data/stick_fight_players");
+
+        FB.onSnapshot(q, (snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                const data = change.doc.data();
+                const remoteUserId = change.doc.id;
+
+                if (remoteUserId === localPlayerId) {
+                    // Ignore local updates
+                    return;
+                }
+
+                if (change.type === "added" || change.type === "modified") {
+                    // Update/create remote player
+                    if (!playerObjects[remoteUserId]) {
+                        createRemotePlayerMesh(remoteUserId);
+                    }
+                    updateRemotePlayerMesh(remoteUserId, data);
+                } else if (change.type === "removed") {
+                    // Remove remote player
+                    removePlayerMesh(remoteUserId);
+                }
+            });
+        }, (error) => {
+            console.error("Error listening to players:", error);
+        });
+    }
+
+    /**
+     * Sets up a real-time listener for the destruction state of the active map.
+     */
+    function setupMapDestructionListener() {
+        const mapDocRef = FB.doc(db, "artifacts", APP_ID, "public/data/stick_fight_maps", `map_${APP_ID}`);
+
+        FB.onSnapshot(mapDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const remoteMapIndex = data.mapIndex || 0;
+                const destroyedBlocks = data.destroyedBlocks || [];
+
+                // 1. Check if map needs switching
+                if (remoteMapIndex !== activeMapIndex) {
+                    activeMapIndex = remoteMapIndex;
+                    generateMapLayout(activeMapIndex);
+                }
+
+                // 2. Apply destruction
+                destroyedBlocks.forEach(blockId => {
+                    if (mapObjects[blockId]) {
+                        removeMapBlockLocally(blockId, false); // false = don't update firestore again
+                    }
+                });
+            } else {
+                // If map doc doesn't exist, create it with initial state
+                FB.setDoc(mapDocRef, { mapIndex: 0, destroyedBlocks: [] }, { merge: true }).catch(console.error);
+            }
+        }, (error) => {
+            console.error("Error listening to map state:", error);
+        });
+    }
+
+    /**
+     * Attempts to destroy a block and updates Firestore via transaction.
+     * @param {string} blockId
+     */
+    async function destroyMapBlock(blockId) {
+        if (!mapObjects[blockId] || !mapObjects[blockId].destructible) return;
+
+        const mapDocRef = FB.doc(db, "artifacts", APP_ID, "public/data/stick_fight_maps", `map_${APP_ID}`);
+
+        try {
+            await FB.runTransaction(db, async (transaction) => {
+                const docSnap = await transaction.get(mapDocRef);
+                const currentDestroyed = docSnap.exists() ? (docSnap.data().destroyedBlocks || []) : [];
+
+                if (!currentDestroyed.includes(blockId)) {
+                    // Only destroy if it hasn't been destroyed yet
+                    transaction.update(mapDocRef, { destroyedBlocks: FB.arrayUnion(blockId) });
+                }
+            });
+        } catch (e) {
+            console.error("Transaction failed (block destruction):", e);
+        }
+    }
+
+    /**
+     * Removes a map block from the physics world and scene.
+     * @param {string} blockId
+     * @param {boolean} notifyFirestore - Whether to initiate the destruction update in Firestore.
+     */
+    function removeMapBlockLocally(blockId, notifyFirestore = true) {
+        const obj = mapObjects[blockId];
+        if (!obj) return;
+
+        scene.remove(obj.mesh);
+        world.remove(obj.body);
+        delete mapObjects[blockId];
+
+        if (notifyFirestore) {
+            // This is the source of the destruction, push it to firestore
+            destroyMapBlock(blockId);
+        }
+    }
+
+    // --- Mesh/Visualization Helpers ---
+
+    /**
+     * Creates the visual mesh for a remote player.
+     * @param {string} id
+     */
+    function createRemotePlayerMesh(id) {
+        // Player Mesh (Stickman - simple cylinder)
+        const playerGeo = new THREE.CylinderGeometry(0.5, 0.5, 2.0, 16);
+        const playerMat = getMaterial(0xeeeeee); // White stickman
+        const mesh = new THREE.Mesh(playerGeo, playerMat);
+        scene.add(mesh);
+
+        // Weapon Mesh (Simple box)
+        const weaponGeo = new THREE.BoxGeometry(1, 0.2, 0.2);
+        const weaponMat = getMaterial(0x0000ff); // Blue weapon
+        const weaponMesh = new THREE.Mesh(weaponGeo, weaponMat);
+        scene.add(weaponMesh);
+
+        playerObjects[id] = { mesh, weaponMesh, bodyId: null };
+    }
+
+    /**
+     * Updates the visual mesh for a player based on remote data.
+     * @param {string} id
+     * @param {object} data
+     */
+    function updateRemotePlayerMesh(id, data) {
+        const obj = playerObjects[id];
+        if (!obj) return;
+
+        // Player Mesh
+        obj.mesh.position.set(data.x, data.y, 0); // Z is 0 for 2D feel
+
+        // Weapon Mesh
+        obj.weaponMesh.position.set(data.wx, data.wy, 0);
+        obj.weaponMesh.quaternion.set(data.wqx, data.wqy, data.wqz, data.wqw);
+    }
+
+    /**
+     * Removes the visual mesh for a disconnected player.
+     * @param {string} id
+     */
+    function removePlayerMesh(id) {
+        const obj = playerObjects[id];
+        if (obj) {
+            scene.remove(obj.mesh);
+            scene.remove(obj.weaponMesh);
+            delete playerObjects[id];
+        }
+    }
+
+    /**
+     * Updates the local player's visual mesh based on the physics body.
+     */
+    function updateLocalPlayerMesh() {
+        if (!stickmanBody || !weaponBody) {
+            // Create local meshes if they don't exist yet, using a special ID
+            if (!playerObjects[localPlayerId]) {
+                createRemotePlayerMesh(localPlayerId);
+                // Give local player a distinct color (Red)
+                playerObjects[localPlayerId].mesh.material = getMaterial(0xff0000);
+            }
+        }
+
+        const playerObj = playerObjects[localPlayerId];
+        if (playerObj) {
+            // Stickman
+            playerObj.mesh.position.copy(stickmanBody.position);
+            playerObj.mesh.quaternion.copy(stickmanBody.quaternion);
+
+            // Weapon
+            playerObj.weaponMesh.position.copy(weaponBody.position);
+            playerObj.weaponMesh.quaternion.copy(weaponBody.quaternion);
+        }
+    }
+
+    // --- Game Loop and Initialization ---
+
+    let lastTime = 0;
+    const timeStep = 1 / 60; // 60 FPS physics
+
+    /**
+     * Main game loop, responsible for physics, logic, and rendering.
+     */
+    function updateGameLoop(time) {
+        if (!gameLoopRunning) return;
+
+        const dt = (time - lastTime) / 1000 || 0;
+        lastTime = time;
+
+        if (world) {
+            // 1. Physics Step
+            world.step(timeStep, dt);
+
+            // 2. Local Player Update
+            if (stickmanBody) {
+                updateLocalPlayerPhysics();
+                updateLocalPlayerMesh();
+            }
+
+            // 3. Destructible Collision Check (Only run on weapon body)
+            for (const blockId in mapObjects) {
+                const obj = mapObjects[blockId];
+                if (obj.destructible) {
+                    // Simplified AABB intersection check instead of complex contacts
+                    // This is for demonstration. A proper game would use Cannon's contact listeners.
+                    const weaponPos = weaponBody.position;
+                    const blockPos = obj.body.position;
+
+                    // Simple proximity check for destruction
+                    const distanceSq = weaponPos.distanceSquared(blockPos);
+                    if (distanceSq < 5) { // If weapon is close to the block
+                        // Check if the weapon is moving fast enough (simulating impact force)
+                        const weaponSpeedSq = weaponBody.velocity.lengthSquared();
+                        if (weaponSpeedSq > DESTRUCTION_IMPULSE_THRESHOLD * DESTRUCTION_IMPULSE_THRESHOLD) {
+                            removeMapBlockLocally(blockId, true); // Destroy it
+                        }
+                    }
+                }
+            }
+
+            // 4. Sync State (less frequently than physics, e.g., every 5 steps)
+            if (Math.floor(time / 100) % 5 === 0) {
+                syncLocalPlayerToFirestore();
+            }
+        }
+
+        // 5. Rendering
+        if (renderer) {
+            renderer.render(scene, camera);
+        }
+
+        requestAnimationFrame(updateGameLoop);
+    }
+
+    /**
+     * Initializes all components and starts the game.
+     */
+    function startGame() {
+        if (gameLoopRunning) return;
+
+        initThree();
+        initCannon();
+        generateMapLayout(activeMapIndex);
+        createLocalPlayer();
+
+        setupPlayerListener();
+        setupMapDestructionListener();
+
+        // Start the loop
+        gameLoopRunning = true;
+        requestAnimationFrame(updateGameLoop);
+        document.getElementById('loading-overlay').style.display = 'none';
+
+        console.log("Game started! Use WASD or Arrow Keys / On-screen buttons.");
+    }
+
+    // --- Input Handlers ---
+
+    function handleKey(event, isDown) {
+        switch (event.code) {
+            case 'KeyA':
+            case 'ArrowLeft':
+                keys.left = isDown;
+                break;
+            case 'KeyD':
+            case 'ArrowRight':
+                keys.right = isDown;
+                break;
+            case 'KeyW':
+            case 'ArrowUp':
+                if (isDown) keys.up = true; // Set to true, consumed by physics loop
+                break;
+            case 'Space':
+                if (isDown) keys.up = true; // Jump with space
+                break;
+            case 'KeyE':
+                if (isDown) keys.attack = true; // Swing weapon
+                break;
+            case 'KeyN': // Next Map (for testing)
+                if (isDown) {
+                    activeMapIndex = (activeMapIndex + 1) % MAP_COUNT;
+                    // Write map switch to Firestore to sync with other players
+                    const mapDocRef = FB.doc(db, "artifacts", APP_ID, "public/data/stick_fight_maps", `map_${APP_ID}`);
+                    FB.setDoc(mapDocRef, { mapIndex: activeMapIndex, destroyedBlocks: [] }, { merge: true }).catch(console.error);
+                }
+                break;
+        }
+    }
+
+    document.addEventListener('keydown', (e) => handleKey(e, true));
+    document.addEventListener('keyup', (e) => handleKey(e, false));
+
+    // Mobile/On-Screen Controls
+    document.getElementById('move-left').addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
+    document.getElementById('move-left').addEventListener('touchend', (e) => { e.preventDefault(); keys.left = false; });
+
+    document.getElementById('move-right').addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
+    document.getElementById('move-right').addEventListener('touchend', (e) => { e.preventDefault(); keys.right = false; });
+
+    document.getElementById('jump-btn').addEventListener('touchstart', (e) => { e.preventDefault(); keys.up = true; });
+    document.getElementById('jump-btn').addEventListener('touchend', (e) => { e.preventDefault(); }); // Jump consumed in physics loop
+
+    document.getElementById('attack-btn').addEventListener('touchstart', (e) => { e.preventDefault(); keys.attack = true; });
+    document.getElementById('attack-btn').addEventListener('touchend', (e) => { e.preventDefault(); }); // Attack consumed in physics loop
+
+    // --- Firebase/App Initialization ---
+
+    window.onload = async function() {
+        // Check for Firebase dependencies and ensure Project ID is present
+        if (!window.FB || !FIREBASE_CONFIG || !FIREBASE_CONFIG.projectId) {
+            console.error("Firebase SDK not loaded or config is incomplete. Missing Project ID.");
+            document.getElementById('loading-overlay').innerHTML = `<span class="text-red-400">Error: Firebase setup failed. Configuration is incomplete (missing Project ID).</span>`;
+            return;
+        }
+
+        try {
+            // 1. Initialize Firebase
+            const app = FB.initializeApp(FIREBASE_CONFIG);
+            db = FB.getFirestore(app);
+            auth = FB.getAuth(app);
+            FB.setLogLevel('Debug');
+
+            // 2. Authenticate
+            await new Promise(resolve => {
+                FB.onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                        document.getElementById('player-id-display').textContent = `ID: ${userId.substring(0, 8)}`;
+                        resolve();
+                    } else {
+                        try {
+                            if (INITIAL_AUTH_TOKEN) {
+                                await FB.signInWithCustomToken(auth, INITIAL_AUTH_TOKEN);
+                            } else {
+                                await FB.signInAnonymously(auth);
+                            }
+                        } catch(e) {
+                            console.error("Authentication failed:", e);
+                            // Fallback to anonymous if custom token fails
+                            await FB.signInAnonymously(auth);
+                        }
+                    }
+                });
+            });
+
+            // 3. Start Game after Auth is ready
+            startGame();
+
+            // 4. Cleanup on unload (best effort)
+            window.addEventListener('beforeunload', async () => {
+                if (userId) {
+                    const playerRef = FB.doc(db, "artifacts", APP_ID, "public/data/stick_fight_players", userId);
+                    await FB.setDoc(playerRef, { isOnline: false }, { merge: true });
+                }
+            });
+
+        } catch (e) {
+            console.error("Critical initialization error:", e);
+            document.getElementById('loading-overlay').innerHTML = `<span class="text-red-400">Error: ${e.message}</span>`;
+        }
+    }
+</script>
+</body>
+</html>
