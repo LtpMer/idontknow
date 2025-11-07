@@ -1,854 +1,1634 @@
 <!DOCTYPE html>
+<html>
+<head>
+    <title><!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stick Fight: Online Physics Brawler</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Inter Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
-    <!-- THREE.js for 3D/2D rendering -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- CANNON.js for physics -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
-    <!-- Firebase Imports -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, runTransaction, arrayRemove, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Global variables for Firebase access (set up by the environment)
-        // Ensure these variables are globally available.
-        window.__app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        window.__firebase_config = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        window.__initial_auth_token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        window.FB = {
-            initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut,
-            getFirestore, doc, setDoc, onSnapshot, collection, query, runTransaction, setLogLevel, arrayRemove, arrayUnion, getDoc
-        };
-    </script>
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #1f2937;
-            color: #f3f4f6;
-            margin: 0;
-            padding: 0;
-            overflow: hidden; /* Hide scrollbars */
-        }
-        #game-container {
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-        }
-        canvas {
-            display: block;
-            touch-action: none; /* Prevents touch scrolling on the canvas */
-        }
-        .ui-panel {
-            position: absolute;
-            top: 0;
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem;
-            z-index: 10;
-        }
-        .game-controls {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            display: flex;
-            justify-content: space-between;
-            padding: 1rem;
-            z-index: 10;
-        }
-        .control-group {
-            display: flex;
-            gap: 0.5rem;
-        }
-        .control-button {
-            padding: 0.75rem 1.25rem;
-            background-color: #f59e0b; /* Amber */
-            color: #1f2937;
-            font-weight: bold;
-            border-radius: 0.5rem;
-            box-shadow: 0 4px #b45309;
-            transition: transform 0.1s, box-shadow 0.1s;
-        }
-        .control-button:active {
-            transform: translateY(2px);
-            box-shadow: 0 2px #b45309;
-        }
-        .loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 20;
-            color: white;
-            font-size: 1.5rem;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maze Game Redux</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+body {
+font-family: 'Inter', sans-serif;
+background-color: #0d1117; /* Dark background */
+display: flex;
+flex-direction: column;
+align-items: center;
+padding: 20px;
+color: #c9d1d9;
+}
+#game-container, #builder-container {
+border: 4px solid #30363d;
+border-radius: 12px;
+box-shadow: 0 10px 30px rgba(0, 255, 0, 0.1);
+overflow: hidden;
+background-color: #161b22;
+}
+canvas {
+display: block;
+}
+.btn {
+@apply px-6 py-3 bg-green-600 text-white font-bold rounded-lg shadow-lg hover:bg-green-700 transition duration-300 ease-in-out transform hover:scale-105 active:bg-green-800 focus:outline-none focus:ring-4 focus:ring-green-500 focus:ring-opacity-50;
+}
+.btn-secondary {
+@apply px-6 py-3 bg-gray-600 text-white font-bold rounded-lg shadow-lg hover:bg-gray-700 transition duration-300 ease-in-out transform hover:scale-105 active:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-gray-500 focus:ring-opacity-50;
+}
+.btn-danger {
+@apply px-4 py-2 bg-red-600 text-white font-bold rounded-lg shadow-md hover:bg-red-700 transition duration-300;
+}
+.btn-publish {
+@apply px-6 py-3 bg-yellow-500 text-gray-900 font-bold rounded-lg shadow-lg hover:bg-yellow-400 transition duration-300 ease-in-out transform hover:scale-105 active:bg-yellow-600 focus:outline-none focus:ring-4 focus:ring-yellow-500 focus:ring-opacity-50;
+}
+.input-field {
+@apply p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:border-green-500 focus:ring-1 focus:ring-green-500 w-20 text-center;
+}
+.text-input {
+@apply p-3 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-indigo-500 focus:border-indigo-500 transition duration-150;
+}
+.screen-container {
+display: flex;
+flex-direction: column;
+align-items: center;
+width: 100%;
+max-width: 800px;
+}
+/* --- Tool Button Styles --- */
+.tool-btn {
+@apply px-3 py-2 text-sm font-semibold rounded-md transition duration-150;
+}
+/* Active (selected) state for any tool is bold green */
+.tool-btn.active {
+@apply bg-green-500 text-white shadow-lg ring-2 ring-green-300;
+}
+/* Inactive state for Placeable Tools (Wall, Player, Winpad, Damage, Fading) - FILLED BLUE */
+.tool-btn:not(.active).placeable-tool {
+@apply bg-blue-600 hover:bg-blue-500 text-white;
+}
+/* Inactive state for Eraser - gray/secondary color */
+.tool-btn:not(.active):not(.placeable-tool) {
+@apply bg-gray-700 hover:bg-gray-500 text-white;
+}
+.level-item {
+@apply p-3 mb-2 rounded-md cursor-pointer transition duration-150;
+}
+.level-item:nth-child(even) {
+@apply bg-gray-600 hover:bg-gray-500;
+}
+.level-item:nth-child(odd) {
+@apply bg-gray-700 hover:bg-gray-600;
+}
+/* Modal specific styling */
+.modal {
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background-color: rgba(0, 0, 0, 0.75);
+display: flex;
+justify-content: center;
+align-items: center;
+z-index: 100;
+}
+.modal-content {
+background-color: #1f2937;
+padding: 30px;
+border-radius: 12px;
+box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+width: 90%;
+max-width: 400px;
+}
+</style>
 </head>
 <body>
-
-<div id="game-container">
-    <!-- The THREE.js canvas will be injected here -->
-    <div class="loading-overlay" id="loading-overlay">
-        <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <span>Connecting to the Arena...</span>
-    </div>
-
-    <div class="ui-panel">
-        <div class="text-lg font-bold">Stick Fight</div>
-        <div class="flex flex-col items-end">
-            <span id="map-info" class="text-sm font-semibold">Map 1/10</span>
-            <span id="player-id-display" class="text-xs text-gray-400">ID: N/A</span>
-        </div>
-    </div>
-
-    <div class="game-controls md:hidden">
-        <div class="control-group">
-            <button class="control-button" id="move-left">◀️</button>
-            <button class="control-button" id="move-right">▶️</button>
-        </div>
-        <div class="control-group">
-            <button class="control-button" id="jump-btn">⬆️ Jump</button>
-            <button class="control-button" id="attack-btn">⚔️ Attack</button>
-        </div>
-    </div>
+<h1 class="text-4xl font-extrabold mb-8 text-green-400">Maze Game Redux</h1>
+<div id="authStatus" class="text-xs mb-4 text-gray-500 h-4">Authenticating...</div>
+<!-- 1. START SCREEN -->
+<div id="startScreen" class="screen-container gap-6">
+<button id="authBtn" class="btn-secondary text-xl w-64 h-16">Log In / Sign Up</button>
+<button id="playOfficialBtn" class="btn-secondary text-xl w-64 h-16">Play</button>
+<button id="customizeColorsBtn" class="btn-secondary text-xl w-64 h-16">Customize Colors</button>
+<button id="communityBtn" class="btn-secondary text-xl w-64 h-16">Community Levels & Builder</button>
+<button id="configRandomMazeBtn" class="btn text-xl w-64 h-16">Configure & Play Random Mazes</button>
 </div>
-
-<script>
-    // Constants and Global State
-    const MAP_COUNT = 10;
-    const DESTRUCTION_IMPULSE_THRESHOLD = 5; // Impulse needed to break a block
-    const PLAYER_SPEED = 5;
-    const JUMP_VELOCITY = 10;
-    const APP_ID = window.__app_id;
-    const FIREBASE_CONFIG = window.__firebase_config;
-    const INITIAL_AUTH_TOKEN = window.__initial_auth_token;
-
-    // Firebase state
-    let db, auth;
-    let userId = null;
-    let isAuthReady = false;
-    let localPlayerId = null;
-
-    // Game state
-    let gameLoopRunning = false;
-    let activeMapIndex = 0;
-    let world;
-    let stickman;
-    let stickmanBody;
-    let weaponBody;
-
-    // THREE.js state
-    let scene, camera, renderer;
-    const playerObjects = {}; // Maps userId to { mesh, weaponMesh, bodyId }
-    const mapObjects = {}; // Maps mapBlockId to { mesh, body }
-    const materialCache = {}; // Cache materials for performance
-
-    // Input state
-    const keys = {
-        left: false, right: false, up: false, attack: false
-    };
-
-    /**
-     * Helper to create a unique block ID
-     * @param {number} x
-     * @param {number} y
-     * @param {number} mapIndex
-     */
-    function createBlockId(x, y, mapIndex) {
-        return `map_${mapIndex}_${x}_${y}`;
-    }
-
-    // --- Core Physics/Rendering Logic ---
-
-    /**
-     * Gets a cached THREE.js material by color.
-     * @param {number} hexColor - The color in hex format (e.g., 0xff0000).
-     * @returns {THREE.Material}
-     */
-    function getMaterial(hexColor) {
-        if (!materialCache[hexColor]) {
-            materialCache[hexColor] = new THREE.MeshLambertMaterial({ color: hexColor });
-        }
-        return materialCache[hexColor];
-    }
-
-    /**
-     * Initializes the Three.js scene, camera, and renderer.
-     */
-    function initThree() {
-        scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x334155); // Slate background
-        camera = new THREE.OrthographicCamera(
-            window.innerWidth / -20, window.innerWidth / 20,
-            window.innerHeight / 20, window.innerHeight / -20,
-            0.1, 1000
-        );
-        camera.position.set(0, 5, 50);
-
-        renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.getElementById('game-container').appendChild(renderer.domElement);
-
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0x404040);
-        scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(1, 1, 1);
-        scene.add(directionalLight);
-
-        window.addEventListener('resize', onWindowResize);
-    }
-
-    /**
-     * Handles window resizing to keep the game responsive.
-     */
-    function onWindowResize() {
-        // Adjust Orthographic camera for aspect ratio change
-        const aspect = window.innerWidth / window.innerHeight;
-        const width = 40; // Fixed world width for orthographic view
-        camera.left = -width * aspect / 2;
-        camera.right = width * aspect / 2;
-        camera.top = width / 2;
-        camera.bottom = -width / 2;
-        camera.updateProjectionMatrix();
-
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-
-    /**
-     * Creates and configures the Cannon.js physics world.
-     */
-    function initCannon() {
-        world = new CANNON.World();
-        world.gravity.set(0, -20, 0); // Increased gravity for snappier 2D platformer feel
-        world.broadphase = new CANNON.NaiveBroadphase();
-        world.solver.iterations = 10; // More iterations for stability
-
-        // Ground Material
-        const groundMaterial = new CANNON.Material("groundMaterial");
-        const slipperyMaterial = new CANNON.Material("slipperyMaterial");
-        const ground_slippery_contact = new CANNON.ContactMaterial(groundMaterial, slipperyMaterial, {
-            friction: 0.1,
-            restitution: 0.3
-        });
-        world.addContactMaterial(ground_slippery_contact);
-
-        // Create a massive ground plane (invisible) to catch things far below the screen
-        const planeShape = new CANNON.Plane();
-        const planeBody = new CANNON.Body({ mass: 0, material: groundMaterial });
-        planeBody.addShape(planeShape);
-        planeBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2); // Rotate to be flat on Y axis
-        planeBody.position.y = -50;
-        world.add(planeBody);
-    }
-
-    /**
-     * Generates one of the 10 possible map layouts.
-     * @param {number} index - Map index (0-9).
-     */
-    function generateMapLayout(index) {
-        // Clear existing map
-        Object.values(mapObjects).forEach(obj => {
-            scene.remove(obj.mesh);
-            world.remove(obj.body);
-        });
-        for (const key in mapObjects) { delete mapObjects[key]; }
-
-        const layout = [
-            // Map 1: Simple Platform
-            [{ x: 0, y: -5, w: 30, h: 2, c: 0x6b7280 }],
-            // Map 2: Split Platforms
-            [{ x: -10, y: -2, w: 10, h: 1, c: 0x9ca3af }, { x: 10, y: -2, w: 10, h: 1, c: 0x9ca3af }],
-            // Map 3: Tower
-            [{ x: 0, y: -5, w: 5, h: 2, c: 0x4b5563 }, { x: 0, y: 0, w: 5, h: 2, c: 0x4b5563 }, { x: 0, y: 5, w: 5, h: 2, c: 0x4b5563 }],
-            // Map 4: Bridge (Destructible)
-            [{ x: -15, y: -5, w: 5, h: 2, c: 0xef4444 }, { x: 0, y: -5, w: 20, h: 1, c: 0xfcd34d, destructible: true }, { x: 15, y: -5, w: 5, h: 2, c: 0xef4444 }],
-            // Map 5: Floating Islands
-            [{ x: -15, y: 0, w: 8, h: 1.5, c: 0x10b981 }, { x: 15, y: 0, w: 8, h: 1.5, c: 0x10b981 }],
-            // Map 6: Diagonal Ascent
-            [{ x: -10, y: -3, w: 8, h: 1, c: 0x3b82f6 }, { x: 0, y: 0, w: 8, h: 1, c: 0x3b82f6 }, { x: 10, y: 3, w: 8, h: 1, c: 0x3b82f6 }],
-            // Map 7: Boxed Center (Destructible Walls)
-            [{ x: 0, y: -5, w: 20, h: 1, c: 0x374151 }, { x: -10, y: 0, w: 1, h: 10, c: 0x374151, destructible: true }, { x: 10, y: 0, w: 1, h: 10, c: 0x374151, destructible: true }],
-            // Map 8: Small Floating Blocks (Destructible)
-            [{ x: -10, y: 0, w: 2, h: 2, c: 0xec4899, destructible: true }, { x: 0, y: 0, w: 2, h: 2, c: 0xec4899, destructible: true }, { x: 10, y: 0, w: 2, h: 2, c: 0xec4899, destructible: true }],
-            // Map 9: L-Shape
-            [{ x: -10, y: -5, w: 15, h: 2, c: 0x6d28d9 }, { x: -15, y: 0, w: 2, h: 10, c: 0x6d28d9 }],
-            // Map 10: The Pit
-            [{ x: -10, y: -5, w: 10, h: 2, c: 0x064e3b }, { x: 10, y: -5, w: 10, h: 2, c: 0x064e3b }],
-        ];
-
-        const mapConfig = layout[index % MAP_COUNT];
-
-        mapConfig.forEach(config => {
-            const { x, y, w, h, c, destructible = false } = config;
-            // Create physics body
-            const halfExtents = new CANNON.Vec3(w / 2, h / 2, 0.5); // Add a small Z depth
-            const boxShape = new CANNON.Box(halfExtents);
-            const body = new CANNON.Body({
-                mass: 0, // Static body
-                shape: boxShape,
-                position: new CANNON.Vec3(x, y, 0),
-                material: new CANNON.Material("groundMaterial")
-            });
-
-            // Create 3D mesh
-            const geometry = new THREE.BoxGeometry(w, h, 1); // Z=1 for visibility
-            const mesh = new THREE.Mesh(geometry, getMaterial(c));
-            mesh.position.copy(body.position);
-            mesh.quaternion.copy(body.quaternion);
-            scene.add(mesh);
-
-            const blockId = createBlockId(x, y, index);
-            mapObjects[blockId] = { mesh, body, destructible };
-            world.add(body);
-        });
-
-        // Update UI
-        document.getElementById('map-info').textContent = `Map ${index + 1}/${MAP_COUNT} (${mapConfig.filter(c => c.destructible).length > 0 ? 'Destructible' : 'Static'})`;
-    }
-
-    /**
-     * Creates the local player's stickman and weapon physics bodies.
-     */
-    function createLocalPlayer() {
-        if (stickmanBody) return; // Already exists
-
-        // Stickman Body (Cylinder for a cleaner look)
-        const radius = 0.5;
-        const height = 2.0;
-        const cylinderShape = new CANNON.Cylinder(radius, radius, height, 16);
-        stickmanBody = new CANNON.Body({
-            mass: 5,
-            shape: cylinderShape,
-            position: new CANNON.Vec3(0, 5, 0),
-            linearDamping: 0.9,
-            fixedRotation: true // Prevent rolling for easier control
-        });
-        stickmanBody.updateAABB(); // Update AABB after creation
-        world.add(stickmanBody);
-
-        // Weapon Body (a long, thin box)
-        const weaponHalfExtents = new CANNON.Vec3(0.5, 0.1, 0.1);
-        const weaponShape = new CANNON.Box(weaponHalfExtents);
-        weaponBody = new CANNON.Body({
-            mass: 1, // Light mass
-            shape: weaponShape,
-            linearDamping: 0.8,
-            angularDamping: 0.8,
-            collisionFilterGroup: 2, // Custom group
-            collisionFilterMask: 1 // Collides with default group (1)
-        });
-        world.add(weaponBody);
-
-        localPlayerId = userId;
-    }
-
-    /**
-     * Checks if the player is touching a surface below them.
-     */
-    function isPlayerGrounded() {
-        const body = stickmanBody;
-        if (!body) return false;
-
-        // Perform a small raycast/sphere sweep downwards
-        const ray = new CANNON.Ray(body.position, body.position.vadd(new CANNON.Vec3(0, -1.1, 0)));
-        ray.skipBackfaces = true;
-        const result = new CANNON.RaycastResult();
-        world.raycastAll(ray.from, ray.to, { skipBackfaces: true }, result);
-
-        // Check if any hit is close enough to be considered grounded
-        for (let i = 0; i < result.hasHit.length; i++) {
-             if (result.distance[i] < 0.1) return true;
-        }
-
-        // Simpler check using velocity and AABB for performance
-        if (body.velocity.y < 0.01 && body.position.y <= -3) { // A basic fallback near map floor level
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * Applies the current player input to the local physics body.
-     */
-    function updateLocalPlayerPhysics() {
-        if (!stickmanBody || !weaponBody) return;
-
-        const grounded = isPlayerGrounded();
-
-        // 1. Movement
-        let velocityX = 0;
-        if (keys.left) velocityX -= PLAYER_SPEED;
-        if (keys.right) velocityX += PLAYER_SPEED;
-
-        // Apply force or set velocity directly
-        if (grounded) {
-            stickmanBody.velocity.x = velocityX;
-        } else {
-            // Air control (less effective)
-            stickmanBody.velocity.x += velocityX * 0.1;
-            stickmanBody.velocity.x = Math.max(Math.min(stickmanBody.velocity.x, PLAYER_SPEED), -PLAYER_SPEED);
-        }
-
-        // 2. Jump
-        if (keys.up && grounded) {
-            stickmanBody.velocity.y = JUMP_VELOCITY;
-            keys.up = false; // Consume jump
-        }
-
-        // 3. Weapon Control
-        // The weapon is attached to the player's position
-        let weaponPosition = stickmanBody.position.vadd(new CANNON.Vec3(0.5, 0, 0));
-        let weaponQuaternion = new CANNON.Quaternion();
-
-        if (keys.attack) {
-            // Apply a strong rotational force for a swing
-            weaponBody.angularVelocity.z = 100; // Fast rotation
-            weaponPosition = stickmanBody.position.vadd(new CANNON.Vec3(0, 1, 0)); // Move weapon up for swing arc
-            keys.attack = false; // Single swing
-        } else {
-            // Keep weapon loosely attached (carry position)
-            weaponBody.position.copy(weaponPosition);
-            weaponBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), Math.PI / 4);
-            weaponBody.velocity.copy(stickmanBody.velocity.vadd(new CANNON.Vec3(0, 0, 0))); // Follow player
-            weaponBody.angularVelocity.set(0, 0, 0);
-        }
-
-        // Check for weapon collision with destructible blocks
-        // The collision detection will happen in the `updateGameLoop`
-    }
-
-    // --- Firebase Synchronization ---
-
-    /**
-     * Pushes the local player's state (position, velocity, weapon state) to Firestore.
-     */
-    async function syncLocalPlayerToFirestore() {
-        if (!userId || !stickmanBody || !weaponBody) return;
-
-        const playerRef = FB.doc(db, "artifacts", APP_ID, "public/data/stick_fight_players", userId);
-
-        const state = {
-            x: stickmanBody.position.x,
-            y: stickmanBody.position.y,
-            vx: stickmanBody.velocity.x,
-            vy: stickmanBody.velocity.y,
-            wx: weaponBody.position.x,
-            wy: weaponBody.position.y,
-            wz: weaponBody.position.z,
-            wqx: weaponBody.quaternion.x,
-            wqy: weaponBody.quaternion.y,
-            wqz: weaponBody.quaternion.z,
-            wqw: weaponBody.quaternion.w,
-            mapIndex: activeMapIndex,
-            lastUpdate: FB.serverTimestamp(),
-            displayName: userId.substring(0, 8),
-            isAttacking: keys.attack
-        };
-
-        try {
-            await FB.setDoc(playerRef, state, { merge: true });
-        } catch (e) {
-            console.error("Error writing player state:", e);
-        }
-    }
-
-    /**
-     * Sets up a real-time listener for all players in the game.
-     */
-    function setupPlayerListener() {
-        const q = FB.collection(db, "artifacts", APP_ID, "public/data/stick_fight_players");
-
-        FB.onSnapshot(q, (snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                const data = change.doc.data();
-                const remoteUserId = change.doc.id;
-
-                if (remoteUserId === localPlayerId) {
-                    // Ignore local updates
-                    return;
-                }
-
-                if (change.type === "added" || change.type === "modified") {
-                    // Update/create remote player
-                    if (!playerObjects[remoteUserId]) {
-                        createRemotePlayerMesh(remoteUserId);
-                    }
-                    updateRemotePlayerMesh(remoteUserId, data);
-                } else if (change.type === "removed") {
-                    // Remove remote player
-                    removePlayerMesh(remoteUserId);
-                }
-            });
-        }, (error) => {
-            console.error("Error listening to players:", error);
-        });
-    }
-
-    /**
-     * Sets up a real-time listener for the destruction state of the active map.
-     */
-    function setupMapDestructionListener() {
-        const mapDocRef = FB.doc(db, "artifacts", APP_ID, "public/data/stick_fight_maps", `map_${APP_ID}`);
-
-        FB.onSnapshot(mapDocRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                const remoteMapIndex = data.mapIndex || 0;
-                const destroyedBlocks = data.destroyedBlocks || [];
-
-                // 1. Check if map needs switching
-                if (remoteMapIndex !== activeMapIndex) {
-                    activeMapIndex = remoteMapIndex;
-                    generateMapLayout(activeMapIndex);
-                }
-
-                // 2. Apply destruction
-                destroyedBlocks.forEach(blockId => {
-                    if (mapObjects[blockId]) {
-                        removeMapBlockLocally(blockId, false); // false = don't update firestore again
-                    }
-                });
-            } else {
-                // If map doc doesn't exist, create it with initial state
-                FB.setDoc(mapDocRef, { mapIndex: 0, destroyedBlocks: [] }, { merge: true }).catch(console.error);
-            }
-        }, (error) => {
-            console.error("Error listening to map state:", error);
-        });
-    }
-
-    /**
-     * Attempts to destroy a block and updates Firestore via transaction.
-     * @param {string} blockId
-     */
-    async function destroyMapBlock(blockId) {
-        if (!mapObjects[blockId] || !mapObjects[blockId].destructible) return;
-
-        const mapDocRef = FB.doc(db, "artifacts", APP_ID, "public/data/stick_fight_maps", `map_${APP_ID}`);
-
-        try {
-            await FB.runTransaction(db, async (transaction) => {
-                const docSnap = await transaction.get(mapDocRef);
-                const currentDestroyed = docSnap.exists() ? (docSnap.data().destroyedBlocks || []) : [];
-
-                if (!currentDestroyed.includes(blockId)) {
-                    // Only destroy if it hasn't been destroyed yet
-                    transaction.update(mapDocRef, { destroyedBlocks: FB.arrayUnion(blockId) });
-                }
-            });
-        } catch (e) {
-            console.error("Transaction failed (block destruction):", e);
-        }
-    }
-
-    /**
-     * Removes a map block from the physics world and scene.
-     * @param {string} blockId
-     * @param {boolean} notifyFirestore - Whether to initiate the destruction update in Firestore.
-     */
-    function removeMapBlockLocally(blockId, notifyFirestore = true) {
-        const obj = mapObjects[blockId];
-        if (!obj) return;
-
-        scene.remove(obj.mesh);
-        world.remove(obj.body);
-        delete mapObjects[blockId];
-
-        if (notifyFirestore) {
-            // This is the source of the destruction, push it to firestore
-            destroyMapBlock(blockId);
-        }
-    }
-
-    // --- Mesh/Visualization Helpers ---
-
-    /**
-     * Creates the visual mesh for a remote player.
-     * @param {string} id
-     */
-    function createRemotePlayerMesh(id) {
-        // Player Mesh (Stickman - simple cylinder)
-        const playerGeo = new THREE.CylinderGeometry(0.5, 0.5, 2.0, 16);
-        const playerMat = getMaterial(0xeeeeee); // White stickman
-        const mesh = new THREE.Mesh(playerGeo, playerMat);
-        scene.add(mesh);
-
-        // Weapon Mesh (Simple box)
-        const weaponGeo = new THREE.BoxGeometry(1, 0.2, 0.2);
-        const weaponMat = getMaterial(0x0000ff); // Blue weapon
-        const weaponMesh = new THREE.Mesh(weaponGeo, weaponMat);
-        scene.add(weaponMesh);
-
-        playerObjects[id] = { mesh, weaponMesh, bodyId: null };
-    }
-
-    /**
-     * Updates the visual mesh for a player based on remote data.
-     * @param {string} id
-     * @param {object} data
-     */
-    function updateRemotePlayerMesh(id, data) {
-        const obj = playerObjects[id];
-        if (!obj) return;
-
-        // Player Mesh
-        obj.mesh.position.set(data.x, data.y, 0); // Z is 0 for 2D feel
-
-        // Weapon Mesh
-        obj.weaponMesh.position.set(data.wx, data.wy, 0);
-        obj.weaponMesh.quaternion.set(data.wqx, data.wqy, data.wqz, data.wqw);
-    }
-
-    /**
-     * Removes the visual mesh for a disconnected player.
-     * @param {string} id
-     */
-    function removePlayerMesh(id) {
-        const obj = playerObjects[id];
-        if (obj) {
-            scene.remove(obj.mesh);
-            scene.remove(obj.weaponMesh);
-            delete playerObjects[id];
-        }
-    }
-
-    /**
-     * Updates the local player's visual mesh based on the physics body.
-     */
-    function updateLocalPlayerMesh() {
-        if (!stickmanBody || !weaponBody) {
-            // Create local meshes if they don't exist yet, using a special ID
-            if (!playerObjects[localPlayerId]) {
-                createRemotePlayerMesh(localPlayerId);
-                // Give local player a distinct color (Red)
-                playerObjects[localPlayerId].mesh.material = getMaterial(0xff0000);
-            }
-        }
-
-        const playerObj = playerObjects[localPlayerId];
-        if (playerObj) {
-            // Stickman
-            playerObj.mesh.position.copy(stickmanBody.position);
-            playerObj.mesh.quaternion.copy(stickmanBody.quaternion);
-
-            // Weapon
-            playerObj.weaponMesh.position.copy(weaponBody.position);
-            playerObj.weaponMesh.quaternion.copy(weaponBody.quaternion);
-        }
-    }
-
-    // --- Game Loop and Initialization ---
-
-    let lastTime = 0;
-    const timeStep = 1 / 60; // 60 FPS physics
-
-    /**
-     * Main game loop, responsible for physics, logic, and rendering.
-     */
-    function updateGameLoop(time) {
-        if (!gameLoopRunning) return;
-
-        const dt = (time - lastTime) / 1000 || 0;
-        lastTime = time;
-
-        if (world) {
-            // 1. Physics Step
-            world.step(timeStep, dt);
-
-            // 2. Local Player Update
-            if (stickmanBody) {
-                updateLocalPlayerPhysics();
-                updateLocalPlayerMesh();
-            }
-
-            // 3. Destructible Collision Check (Only run on weapon body)
-            for (const blockId in mapObjects) {
-                const obj = mapObjects[blockId];
-                if (obj.destructible) {
-                    // Simplified AABB intersection check instead of complex contacts
-                    // This is for demonstration. A proper game would use Cannon's contact listeners.
-                    const weaponPos = weaponBody.position;
-                    const blockPos = obj.body.position;
-
-                    // Simple proximity check for destruction
-                    const distanceSq = weaponPos.distanceSquared(blockPos);
-                    if (distanceSq < 5) { // If weapon is close to the block
-                        // Check if the weapon is moving fast enough (simulating impact force)
-                        const weaponSpeedSq = weaponBody.velocity.lengthSquared();
-                        if (weaponSpeedSq > DESTRUCTION_IMPULSE_THRESHOLD * DESTRUCTION_IMPULSE_THRESHOLD) {
-                            removeMapBlockLocally(blockId, true); // Destroy it
-                        }
-                    }
-                }
-            }
-
-            // 4. Sync State (less frequently than physics, e.g., every 5 steps)
-            if (Math.floor(time / 100) % 5 === 0) {
-                syncLocalPlayerToFirestore();
-            }
-        }
-
-        // 5. Rendering
-        if (renderer) {
-            renderer.render(scene, camera);
-        }
-
-        requestAnimationFrame(updateGameLoop);
-    }
-
-    /**
-     * Initializes all components and starts the game.
-     */
-    function startGame() {
-        if (gameLoopRunning) return;
-
-        initThree();
-        initCannon();
-        generateMapLayout(activeMapIndex);
-        createLocalPlayer();
-
-        setupPlayerListener();
-        setupMapDestructionListener();
-
-        // Start the loop
-        gameLoopRunning = true;
-        requestAnimationFrame(updateGameLoop);
-        document.getElementById('loading-overlay').style.display = 'none';
-
-        console.log("Game started! Use WASD or Arrow Keys / On-screen buttons.");
-    }
-
-    // --- Input Handlers ---
-
-    function handleKey(event, isDown) {
-        switch (event.code) {
-            case 'KeyA':
-            case 'ArrowLeft':
-                keys.left = isDown;
-                break;
-            case 'KeyD':
-            case 'ArrowRight':
-                keys.right = isDown;
-                break;
-            case 'KeyW':
-            case 'ArrowUp':
-                if (isDown) keys.up = true; // Set to true, consumed by physics loop
-                break;
-            case 'Space':
-                if (isDown) keys.up = true; // Jump with space
-                break;
-            case 'KeyE':
-                if (isDown) keys.attack = true; // Swing weapon
-                break;
-            case 'KeyN': // Next Map (for testing)
-                if (isDown) {
-                    activeMapIndex = (activeMapIndex + 1) % MAP_COUNT;
-                    // Write map switch to Firestore to sync with other players
-                    const mapDocRef = FB.doc(db, "artifacts", APP_ID, "public/data/stick_fight_maps", `map_${APP_ID}`);
-                    FB.setDoc(mapDocRef, { mapIndex: activeMapIndex, destroyedBlocks: [] }, { merge: true }).catch(console.error);
-                }
-                break;
-        }
-    }
-
-    document.addEventListener('keydown', (e) => handleKey(e, true));
-    document.addEventListener('keyup', (e) => handleKey(e, false));
-
-    // Mobile/On-Screen Controls
-    document.getElementById('move-left').addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
-    document.getElementById('move-left').addEventListener('touchend', (e) => { e.preventDefault(); keys.left = false; });
-
-    document.getElementById('move-right').addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
-    document.getElementById('move-right').addEventListener('touchend', (e) => { e.preventDefault(); keys.right = false; });
-
-    document.getElementById('jump-btn').addEventListener('touchstart', (e) => { e.preventDefault(); keys.up = true; });
-    document.getElementById('jump-btn').addEventListener('touchend', (e) => { e.preventDefault(); }); // Jump consumed in physics loop
-
-    document.getElementById('attack-btn').addEventListener('touchstart', (e) => { e.preventDefault(); keys.attack = true; });
-    document.getElementById('attack-btn').addEventListener('touchend', (e) => { e.preventDefault(); }); // Attack consumed in physics loop
-
-    // --- Firebase/App Initialization ---
-
-    window.onload = async function() {
-        // Check for Firebase dependencies and ensure Project ID is present
-        if (!window.FB || !FIREBASE_CONFIG || !FIREBASE_CONFIG.projectId) {
-            console.error("Firebase SDK not loaded or config is incomplete. Missing Project ID.");
-            document.getElementById('loading-overlay').innerHTML = `<span class="text-red-400">Error: Firebase setup failed. Configuration is incomplete (missing Project ID).</span>`;
-            return;
-        }
-
-        try {
-            // 1. Initialize Firebase
-            const app = FB.initializeApp(FIREBASE_CONFIG);
-            db = FB.getFirestore(app);
-            auth = FB.getAuth(app);
-            FB.setLogLevel('Debug');
-
-            // 2. Authenticate
-            await new Promise(resolve => {
-                FB.onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        isAuthReady = true;
-                        document.getElementById('player-id-display').textContent = `ID: ${userId.substring(0, 8)}`;
-                        resolve();
-                    } else {
-                        try {
-                            if (INITIAL_AUTH_TOKEN) {
-                                await FB.signInWithCustomToken(auth, INITIAL_AUTH_TOKEN);
-                            } else {
-                                await FB.signInAnonymously(auth);
-                            }
-                        } catch(e) {
-                            console.error("Authentication failed:", e);
-                            // Fallback to anonymous if custom token fails
-                            await FB.signInAnonymously(auth);
-                        }
-                    }
-                });
-            });
-
-            // 3. Start Game after Auth is ready
-            startGame();
-
-            // 4. Cleanup on unload (best effort)
-            window.addEventListener('beforeunload', async () => {
-                if (userId) {
-                    const playerRef = FB.doc(db, "artifacts", APP_ID, "public/data/stick_fight_players", userId);
-                    await FB.setDoc(playerRef, { isOnline: false }, { merge: true });
-                }
-            });
-
-        } catch (e) {
-            console.error("Critical initialization error:", e);
-            document.getElementById('loading-overlay').innerHTML = `<span class="text-red-400">Error: ${e.message}</span>`;
-        }
-    }
+<!-- 2. NEW RANDOM CONFIG SCREEN -->
+<div id="randomConfigScreen" class="screen-container gap-4 p-4 bg-gray-800 rounded-xl shadow-inner hidden">
+    <h2 class="text-3xl font-bold text-green-400">Random Maze Settings</h2>
+    <p class="text-sm text-yellow-300 text-center">Set the dimensions for the dynamically generated mazes. These settings DO NOT affect the Draft Builder.</p>
+    <div class="flex flex-wrap justify-center items-center gap-4 p-4 bg-gray-700 rounded-xl shadow-inner w-full">
+        <label for="randomMazeWidthInput" class="text-sm">Width (Carved Path needs odd, min 17):</label>
+        <input type="number" id="randomMazeWidthInput" value="31" min="5" max="1001" class="input-field">
+        <label for="randomMazeHeightInput" class="text-sm">Height (Carved Path needs odd, min 17):</label>
+        <input type="number" id="randomMazeHeightInput" value="17" min="5" max="1001" class="input-field">
+    </div>
+    <p id="randomModeSelectText" class="text-lg font-semibold text-white">Select Generation Type:</p>
+    <div class="flex gap-4">
+        <button id="startCarvedMazeBtn" class="btn text-xl w-40 h-16">Start Carved Maze</button>
+        <button id="startRandomBlockBtn" class="btn text-xl w-40 h-16">Start Random Blocks</button>
+    </div>
+    <button id="backToStartFromRandomBtn" class="btn-secondary w-64 mt-4">Back to Menu</button>
+</div>
+<!-- 3. CUSTOMIZE COLORS SCREEN -->
+<div id="colorCustomizeScreen" class="screen-container gap-4 p-4 bg-gray-800 rounded-xl shadow-inner hidden">
+<p class="text-lg font-semibold mb-2">Customize Block Colors</p>
+<div class="flex flex-col gap-3 w-64">
+<label class="flex justify-between items-center">
+<span class="text-sm">Player Block Color:</span>
+<input type="color" id="playerColorInput" value="#FF0000" class="w-16 h-8 rounded-md">
+</label>
+<label class="flex justify-between items-center">
+<span class="text-sm">Wall Block Color:</span>
+<input type="color" id="wallColorInput" value="#30363D" class="w-16 h-8 rounded-md">
+</label>
+<label class="flex justify-between items-center">
+<span class="text-sm">Goal Block Color (Unreached):</span>
+<input type="color" id="goalColorInput" value="#007BFF" class="w-16 h-8 rounded-md">
+</label>
+<label class="flex justify-between items-center">
+<span class="text-sm">Goal Block Color (Win):</span>
+<input type="color" id="winColorInput" value="#00FF00" class="w-16 h-8 rounded-md">
+</label>
+<label class="flex justify-between items-center">
+<span class="text-sm text-red-400">Damage Block Color:</span>
+<input type="color" id="damageColorInput" value="#FF4444" class="w-16 h-8 rounded-md">
+</label>
+<label class="flex justify-between items-center">
+<span class="text-sm text-purple-400">Fading Wall Color (Solid):</span>
+<input type="color" id="fadingWallColorInput" value="#8B5CF6" class="w-16 h-8 rounded-md">
+</label>
+</div>
+<button id="saveColorsBtn" class="btn mt-4">Save and Return</button>
+</div>
+<!-- 4. GAME SCREEN -->
+<div id="gameScreen" class="screen-container hidden">
+<div id="game-info" class="flex justify-between w-full max-w-lg mb-4 p-3 bg-gray-700 rounded-lg shadow-inner">
+<div id="healthDisplay" class="text-lg font-bold text-red-400">❤️ Health: 10</div>
+<div id="levelNameDisplay" class="text-lg font-semibold text-green-300"></div>
+</div>
+<div id="game-container">
+<canvas id="mazeCanvas"></canvas>
+</div>
+<div id="statusMessage" class="mt-6 text-lg font-semibold h-8 text-white">
+Use **Arrow Keys** to move the red player block. Find the **Blue** goal!
+</div>
+<div class="flex flex-wrap justify-center items-center gap-4 mt-4">
+<!-- Default Controls for Random/Community Levels -->
+<div id="gameControlsDefault">
+<button id="newMazeBtn" class="btn">New Maze</button>
+<button id="exitGameBtn" class="btn-secondary">Exit to Menu</button>
+</div>
+<!-- Playtest Controls -->
+<div id="gameControlsPlaytest" class="hidden">
+<button id="resetPlaytestBtn" class="btn-danger">🔄 Reset</button>
+<button id="backToBuilderBtn" class="btn bg-red-600 hover:bg-red-700">↩️ Back to Builder</button>
+</div>
+<!-- Publish Control (Shown on Win for Drafts) -->
+<button id="publishBtn" class="btn-publish hidden">✨ Publish to Community</button>
+</div>
+<div id="mobileControlsContainer" class="mt-8 lg:hidden flex justify-center gap-4">
+<!-- Mobile Controls are now inside this container for potential dragging -->
+<button onclick="movePlayer(0, -1)" class="btn w-16 h-16 text-2xl">↑</button>
+<button onclick="movePlayer(0, 1)" class="btn w-16 h-16 text-2xl">↓</button>
+<button onclick="movePlayer(-1, 0)" class="btn w-16 h-16 text-2xl">←</button>
+<button onclick="movePlayer(1, 0)" class="btn w-16 h-16 text-2xl">→</button>
+</div>
+</div>
+<!-- 5. COMMUNITY SCREEN -->
+<div id="communityScreen" class="screen-container hidden gap-6 p-6 bg-gray-800 rounded-xl shadow-inner">
+<h2 id="communityHeader" class="text-3xl font-bold text-green-400">Community Hub</h2>
+<div class="flex gap-4 mb-4">
+<button id="showBuilderBtn" class="btn-secondary">Create/Edit</button>
+<button id="showLevelsBtn" class="btn-secondary">Browse Community Levels</button>
+<button id="showDraftsBtn" class="btn-secondary">My Drafts</button>
+<button id="showLeaderboardsBtn" class="btn-secondary">🏆 Leaderboards</button>
+</div>
+<div id="communityContent" class="w-full flex flex-col items-center">
+<!-- MAZE BUILDER SECTION -->
+<div id="mazeBuilderSection" class="w-full flex flex-col items-center gap-4 p-4 bg-gray-700 rounded-lg hidden">
+<p class="text-sm text-yellow-300 text-center">Use the tools below to design on the grid. Saved drafts will use the dimensions set below.</p>
+<!-- NEW: Draft Builder Size Controls -->
+<div class="flex flex-wrap justify-center items-center gap-4 p-4 bg-gray-600 rounded-xl shadow-inner w-full">
+    <p class="text-md font-semibold w-full text-center text-green-300">Draft Builder Size (5 - 31)</p>
+    <label for="builderWidthInput" class="text-sm">Width:</label>
+    <input type="number" id="builderWidthInput" value="15" min="5" max="31" class="input-field">
+    <label for="builderHeightInput" class="text-sm">Height:</label>
+    <input type="number" id="builderHeightInput" value="15" min="5" max="31" class="input-field">
+    <button id="resizeBuilderBtn" class="btn-secondary px-4 py-2">Resize Grid</button>
+</div>
+<!-- NEW: Fading Wall Cooldown Input -->
+<div class="flex flex-wrap justify-center items-center gap-4 p-3 bg-gray-600 rounded-xl shadow-inner w-full">
+<p class="text-md font-semibold w-full text-center text-purple-300">Fading Wall Cooldown</p>
+<label for="fadingWallCooldownInput" class="text-sm">Cooldown (ms):</label>
+<input type="number" id="fadingWallCooldownInput" value="3000" min="500" max="60000" class="input-field w-24">
+<p class="text-xs text-gray-400">(Saved with draft)</p>
+</div>
+<!-- Tool Selection Buttons -->
+<div id="builderTools" class="flex flex-wrap justify-center gap-2 p-3 bg-gray-600 rounded-lg w-full">
+<button id="toolWall" class="tool-btn active placeable-tool" data-tool="wall">🧱 Wall</button>
+<button id="toolPlayer" class="tool-btn placeable-tool" data-tool="player">🔴 Player Start</button>
+<button id="toolWinpad" class="tool-btn placeable-tool" data-tool="winpad">🔵 Winpad</button>
+<button id="toolDamage" class="tool-btn placeable-tool" data-tool="damage">💥 Damage Block</button>
+<button id="toolFadingWall" class="tool-btn placeable-tool" data-tool="fadingwall">🔮 Fading Wall</button>
+<button id="toolErase" class="tool-btn" data-tool="erase">🧽 Eraser (Path)</button>
+</div>
+<div id="builder-container">
+<canvas id="builderCanvas" width="375" height="375" class="rounded-lg"></canvas>
+</div>
+<div class="flex flex-wrap justify-center items-center gap-4">
+<button id="clearBuilderBtn" class="btn-danger">Clear Grid</button>
+<button id="playtestMazeBtn" class="btn bg-blue-600 hover:bg-blue-700">▶️ Playtest Maze</button>
+<input type="text" id="mazeNameInput" placeholder="Enter Draft Name" class="text-input w-48">
+<button id="saveDraftBtn" class="btn bg-purple-600 hover:bg-purple-700">💾 Save Draft (Private)</button>
+</div>
+</div>
+<!-- COMMUNITY LEVELS LIST SECTION -->
+<div id="levelsListSection" class="w-full hidden">
+<p class="text-sm text-gray-400 mb-2">Click a level to play it!</p>
+<div id="levelsList" class="w-full rounded-lg p-3 max-h-96 overflow-y-auto border border-gray-600">
+<p class="text-center text-gray-400">Loading community levels...</p>
+</div>
+</div>
+<!-- MY DRAFTS LIST SECTION -->
+<div id="draftsListSection" class="w-full hidden">
+<p id="draftsStatus" class="text-sm text-gray-400 mb-2">Loading your private drafts...</p>
+<div id="draftsList" class="w-full rounded-lg p-3 max-h-96 overflow-y-auto border border-gray-600">
+<p class="text-center text-gray-400">Please **Log In** to view your saved drafts.</p>
+</div>
+</div>
+<!-- LEADERBOARDS SECTION (Placeholder) -->
+<div id="leaderboardsSection" class="w-full hidden">
+<h3 class="text-xl font-bold mb-4">Bricks Score Leaderboard (To be implemented)</h3>
+<div class="w-full rounded-lg p-3 max-h-96 overflow-y-auto border border-gray-600">
+<p class="text-center text-gray-400">This feature will track "Bricks" (blocks placed) to rank players based on their contribution to the community. Check back soon!</p>
+</div>
+</div>
+</div>
+<button id="backToStartFromCommunityBtn" class="btn-secondary mt-4 w-64">Back to Menu</button>
+</div>
+<!-- 6. LOGIN/SIGNUP MODAL -->
+<div id="loginSignupModal" class="modal hidden">
+<div class="modal-content">
+<h2 id="modal-title" class="text-2xl font-bold text-center text-white mb-6">Log In</h2>
+<div id="modal-message-box" class="hidden p-3 mb-4 rounded-lg text-sm text-center"></div>
+<div id="modal-form">
+<!-- NEW Player Name Field (Visible only for Sign Up) -->
+<div id="player-name-field" class="mb-4 hidden">
+<label for="modal-playername" class="block text-sm font-medium text-gray-300 mb-1">Player Name</label>
+<input type="text" id="modal-playername" class="text-input w-full" placeholder="Your display name" required>
+</div>
+<div class="mb-4">
+<label for="modal-email" class="block text-sm font-medium text-gray-300 mb-1">Email</label>
+<input type="email" id="modal-email" class="text-input w-full" placeholder="you@example.com" required>
+</div>
+<div class="mb-4">
+<label for="modal-password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+<input type="password" id="modal-password" class="text-input w-full" placeholder="Min 6 characters" required>
+</div>
+<!-- NEW Forgot Password Link (Visible only for Log In) -->
+<button id="forgot-password-button" class="text-xs text-indigo-400 hover:text-indigo-300 transition duration-150 mb-4 text-left w-full" onclick="handleForgotPasswordPrompt()">
+Forgot Password?
+</button>
+<button id="modal-auth-button" class="w-full py-3 px-4 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition duration-150" onclick="handleEmailAuth()">
+Log In
+</button>
+<p class="mt-4 text-center text-sm text-gray-400">
+<span id="modal-toggle-text">Need an account?</span>
+<button class="text-indigo-400 hover:text-indigo-300 font-medium ml-1 transition duration-150" onclick="toggleAuthMode()">
+<span id="modal-toggle-link-text">Sign Up</span>
+</button>
+</p>
+</div>
+<button id="modal-close-button" class="btn-secondary w-full mt-6" onclick="closeAuthModal()">Close</button>
+<button id="modal-logout-button" class="btn-danger w-full mt-3 hidden" onclick="handleLogout()">Log Out</button>
+</div>
+</div>
+<script type="module">
+// --- FIREBASE IMPORTS (REQUIRED FOR COMMUNITY FEATURES) ---
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, collection, query, getDocs, addDoc, onSnapshot, setLogLevel, limit, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// --- GLOBAL CONFIGURATION & HTML ELEMENTS ---
+const gameCanvas = document.getElementById('mazeCanvas');
+const gameCtx = gameCanvas.getContext('2d');
+const builderCanvas = document.getElementById('builderCanvas');
+const builderCtx = builderCanvas.getContext('2d');
+const statusMessage = document.getElementById('statusMessage');
+const authStatus = document.getElementById('authStatus');
+const levelsListDiv = document.getElementById('levelsList');
+const draftsListDiv = document.getElementById('draftsList');
+const draftsStatus = document.getElementById('draftsStatus');
+const mazeNameInput = document.getElementById('mazeNameInput');
+const builderToolsDiv = document.getElementById('builderTools');
+const healthDisplay = document.getElementById('healthDisplay');
+const levelNameDisplay = document.getElementById('levelNameDisplay');
+// Block Type Constants
+const PATH = 0;
+const WALL = 1;
+const PLAYER_START = 2;
+const WINPAD = 3;
+const DAMAGE = 4;
+const FADING_WALL_SOLID = 5; // New: Wall state
+const FADING_WALL_FADED = 6; // New: Path/Cooldown state
+// NEW Config Inputs
+const randomMazeWidthInput = document.getElementById('randomMazeWidthInput');
+const randomMazeHeightInput = document.getElementById('randomMazeHeightInput');
+const builderWidthInput = document.getElementById('builderWidthInput');
+const builderHeightInput = document.getElementById('builderHeightInput');
+const fadingWallCooldownInput = document.getElementById('fadingWallCooldownInput');
+// Auth Modal Elements (unmodified)
+const loginSignupModal = document.getElementById('loginSignupModal');
+const modalTitle = document.getElementById('modal-title');
+const modalAuthButton = document.getElementById('modal-auth-button');
+const modalToggleText = document.getElementById('modal-toggle-text');
+const modalToggleLinkText = document.getElementById('modal-toggle-link-text');
+const modalMessageBox = document.getElementById('modal-message-box');
+const modalLogoutButton = document.getElementById('modal-logout-button');
+const modalEmail = document.getElementById('modal-email');
+const modalPassword = document.getElementById('modal-password');
+const modalPlayerName = document.getElementById('modal-playername');
+const playerNameField = document.getElementById('player-name-field');
+const forgotPasswordButton = document.getElementById('forgot-password-button');
+// Screen Elements
+const startScreen = document.getElementById('startScreen');
+const randomConfigScreen = document.getElementById('randomConfigScreen'); // New Screen
+const colorCustomizeScreen = document.getElementById('colorCustomizeScreen');
+const gameScreen = document.getElementById('gameScreen');
+const communityScreen = document.getElementById('communityScreen');
+const mazeBuilderSection = document.getElementById('mazeBuilderSection');
+const levelsListSection = document.getElementById('levelsListSection');
+const draftsListSection = document.getElementById('draftsListSection');
+const leaderboardsSection = document.getElementById('leaderboardsSection');
+// Game Control Containers
+const gameControlsDefault = document.getElementById('gameControlsDefault');
+const gameControlsPlaytest = document.getElementById('gameControlsPlaytest');
+// Buttons
+const authBtn = document.getElementById('authBtn');
+const playOfficialBtn = document.getElementById('playOfficialBtn');
+const customizeColorsBtn = document.getElementById('customizeColorsBtn');
+const communityBtn = document.getElementById('communityBtn');
+const saveColorsBtn = document.getElementById('saveColorsBtn');
+const newMazeBtn = document.getElementById('newMazeBtn');
+const exitGameBtn = document.getElementById('exitGameBtn');
+const backToStartFromCommunityBtn = document.getElementById('backToStartFromCommunityBtn');
+const showBuilderBtn = document.getElementById('showBuilderBtn');
+const showLevelsBtn = document.getElementById('showLevelsBtn');
+const showDraftsBtn = document.getElementById('showDraftsBtn');
+const showLeaderboardsBtn = document.getElementById('showLeaderboardsBtn');
+const clearBuilderBtn = document.getElementById('clearBuilderBtn');
+const saveDraftBtn = document.getElementById('saveDraftBtn');
+const playtestMazeBtn = document.getElementById('playtestMazeBtn');
+const backToBuilderBtn = document.getElementById('backToBuilderBtn');
+const publishBtn = document.getElementById('publishBtn');
+const resetPlaytestBtn = document.getElementById('resetPlaytestBtn');
+const configRandomMazeBtn = document.getElementById('configRandomMazeBtn'); // New Button
+// NEW Random Config Screen Buttons
+const startCarvedMazeBtn = document.getElementById('startCarvedMazeBtn');
+const startRandomBlockBtn = document.getElementById('startRandomBlockBtn');
+const backToStartFromRandomBtn = document.getElementById('backToStartFromRandomBtn');
+// NEW Builder Resize Button
+const resizeBuilderBtn = document.getElementById('resizeBuilderBtn');
+// Color Inputs
+const playerColorInput = document.getElementById('playerColorInput');
+const wallColorInput = document.getElementById('wallColorInput');
+const goalColorInput = document.getElementById('goalColorInput');
+const winColorInput = document.getElementById('winColorInput');
+const damageColorInput = document.getElementById('damageColorInput');
+const fadingWallColorInput = document.getElementById('fadingWallColorInput'); // New Color Input
+// Display/Viewport Settings
+const VIEWPORT_WIDTH = 800;
+const VIEWPORT_HEIGHT = 600;
+const BLOCK_SIZE = 20; // Game Block Size
+const BUILDER_BLOCK_SIZE = 25; // Builder Block Size (remains constant for visual density)
+const MIN_BUILDER_DIM = 5;
+const MAX_BUILDER_DIM = 31; // Max size for builder to prevent large saved drafts
+const MAX_HEALTH = 10; // Defined Constant
+// Game State
+let maze = [];
+let mazeCols = 0;
+let mazeRows = 0;
+let player = { x: 1, y: 1 };
+let playerStart = { x: 1, y: 1 };
+let playerHealth = MAX_HEALTH;
+let finish = { x: 0, y: 0 };
+let isGameOver = false;
+let isBuilding = false;
+let currentLevelSource = 'none';
+let currentSourceDocId = null;
+let fadingWallCooldownMs = 3000; // New state: Default cooldown
+let fadingWallTimers = []; // {r, c, timerId} to track active faded walls
+// Color State
+let playerColor = '#FF0000';
+let wallColor = '#30363D';
+let goalColor = '#007BFF';
+let winColor = '#00FF00';
+let damageColor = '#FF4444';
+let fadingWallColor = '#8B5CF6'; // New color state
+// Camera State (unmodified)
+let cameraX = 0;
+let cameraY = 0;
+// Builder State
+let builderMaze = [];
+let builderCols = 15; // Initial default
+let builderRows = 15; // Initial default
+let currentTool = 'wall';
+let isDrawing = false;
+let isEditingDraftId = null;
+let isEditingDraftName = '';
+// Auth State (unmodified)
+let currentAuthMode = 'login';
+// Game Timer for Redrawing (Needed for fading wall visuals)
+let gameLoopInterval = null;
+
+// --- FIREBASE & DATABASE SETUP ---
+const firebaseConfig = {
+apiKey: "AIzaSyCbsH9mIPnRT7ZXdtvW06oRr4ZivdE9EQE",
+authDomain: "maze-game-redux.firebaseapp.com",
+projectId: "maze-game-redux",
+storageBucket: "maze-game-redux.firebasestorage.app",
+messagingSenderId: "116539816483",
+appId: "1:116539816483:web:334fb01e3f31f1fd610f96",
+measurementId: "G-DYE5DH44DV"
+};
+const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.appId; // Use global __app_id
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+let db;
+let auth;
+let userId = null;
+let isEmailAuthenticated = false;
+const MAZES_COLLECTION_PATH = `artifacts/${appId}/public/data/mazes`;
+const getDraftsPath = (uid) => `artifacts/${appId}/users/${uid}/draft_mazes`;
+/**
+* Clamps a value between a minimum and maximum.
+*/
+const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
+/**
+* Clears all running fading wall timers.
+*/
+function clearFadingWallTimers() {
+fadingWallTimers.forEach(timer => clearTimeout(timer.timerId));
+fadingWallTimers = [];
+}
+/**
+* Starts the continuous game loop (for fading visuals).
+*/
+function startGameLoop() {
+if (gameLoopInterval) clearInterval(gameLoopInterval);
+// Update drawing every 100ms for smooth fading wall visuals
+gameLoopInterval = setInterval(drawGame, 100);
+}
+/**
+* Stops the continuous game loop.
+*/
+function stopGameLoop() {
+if (gameLoopInterval) clearInterval(gameLoopInterval);
+gameLoopInterval = null;
+}
+/**
+* Updates the health display in the UI.
+*/
+function updateHealthDisplay() {
+healthDisplay.textContent = `❤️ Health: ${playerHealth}`;
+if (playerHealth <= 3) {
+healthDisplay.classList.remove('text-red-400', 'text-yellow-400');
+healthDisplay.classList.add('text-red-600', 'font-extrabold');
+} else if (playerHealth <= 7) {
+healthDisplay.classList.remove('text-red-600', 'font-extrabold', 'text-red-400');
+healthDisplay.classList.add('text-yellow-400');
+} else {
+healthDisplay.classList.remove('text-red-600', 'font-extrabold', 'text-yellow-400');
+healthDisplay.classList.add('text-red-400');
+}
+}
+/**
+* Updates the level name display.
+*/
+function updateLevelNameDisplay(name) {
+levelNameDisplay.textContent = name ? `Level: ${name}` : '';
+}
+/**
+* Displays a temporary message in the status area.
+*/
+function alertMessage(message, isError = false) {
+const originalText = statusMessage.textContent;
+statusMessage.textContent = message;
+statusMessage.classList.remove('text-white', 'text-red-400', 'text-yellow-400');
+statusMessage.classList.add(isError ? 'text-red-400' : 'text-yellow-400');
+setTimeout(() => {
+if (statusMessage.textContent === message) {
+statusMessage.textContent = 'Use **Arrow Keys** to move the red player block. Find the **Blue** goal!';
+statusMessage.classList.remove('text-red-400', 'text-yellow-400');
+statusMessage.classList.add('text-white');
+}
+}, 3000);
+}
+/**
+* Displays a temporary message in the modal message box.
+*/
+function modalAlertMessage(message, isError = false) {
+modalMessageBox.innerHTML = message;
+modalMessageBox.classList.remove('hidden', 'bg-red-900', 'text-red-300', 'bg-green-900', 'text-green-300');
+if (isError) {
+modalMessageBox.classList.add('bg-red-900', 'text-red-300');
+} else {
+modalMessageBox.classList.add('bg-green-900', 'text-green-300');
+}
+setTimeout(() => {
+modalMessageBox.classList.add('hidden');
+}, 5000);
+}
+/**
+* Initializes Firebase services and handles authentication.
+*/
+async function initializeFirebase() {
+let configToUse = firebaseConfig;
+if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+try {
+configToUse = JSON.parse(__firebase_config);
+} catch (e) {
+console.error("Failed to parse __firebase_config, using hardcoded config.");
+}
+}
+if (!configToUse) {
+console.error("Firebase configuration not available.");
+authStatus.textContent = "Error: Database config missing.";
+return;
+}
+try {
+setLogLevel('Debug');
+const app = initializeApp(configToUse);
+auth = getAuth(app);
+db = getFirestore(app);
+if (initialAuthToken) {
+await signInWithCustomToken(auth, initialAuthToken);
+} else {
+await signInAnonymously(auth);
+}
+onAuthStateChanged(auth, (user) => {
+if (user) {
+userId = user.uid;
+isEmailAuthenticated = user.email !== null;
+if (isEmailAuthenticated) {
+const displayName = user.displayName || user.email.split('@')[0];
+authStatus.textContent = `Signed in as: ${displayName} (Email Account)`;
+authBtn.textContent = 'Log Out';
+modalLogoutButton.classList.remove('hidden');
+} else {
+authStatus.textContent = `Playing Anonymously. (ID: ${userId})`; // Show full ID per instruction
+authBtn.textContent = 'Log In / Sign Up';
+modalLogoutButton.classList.add('hidden');
+}
+console.log("Authenticated with UID:", userId, "Email Auth:", isEmailAuthenticated);
+if (!communityScreen.classList.contains('hidden')) {
+loadCommunityLevels();
+loadMyDrafts();
+}
+} else {
+userId = null;
+isEmailAuthenticated = false;
+authStatus.textContent = "Signed Out.";
+authBtn.textContent = 'Log In / Sign Up';
+modalLogoutButton.classList.add('hidden');
+signInAnonymously(auth).catch(e => console.error("Failed to sign in anonymously:", e));
+}
+});
+} catch (error) {
+console.error("Firebase initialization failed:", error);
+authStatus.textContent = "Error: Failed to connect to database.";
+}
+}
+// --- AUTH MODAL FUNCTIONS ---
+window.openAuthModal = function() {
+loginSignupModal.classList.remove('hidden');
+modalEmail.value = '';
+modalPassword.value = '';
+modalPlayerName.value = '';
+if (isEmailAuthenticated) {
+const displayName = auth.currentUser.displayName || auth.currentUser.email;
+modalTitle.textContent = `Signed in as ${displayName}`;
+document.getElementById('modal-form').classList.add('hidden');
+modalLogoutButton.classList.remove('hidden');
+} else {
+document.getElementById('modal-form').classList.remove('hidden');
+modalLogoutButton.classList.add('hidden');
+toggleAuthMode(currentAuthMode);
+}
+}
+window.closeAuthModal = function() {
+loginSignupModal.classList.add('hidden');
+modalMessageBox.classList.add('hidden');
+}
+window.toggleAuthMode = function(mode) {
+currentAuthMode = mode || (currentAuthMode === 'login' ? 'signup' : 'login');
+modalTitle.textContent = currentAuthMode === 'login' ? 'Log In' : 'Create Account';
+modalAuthButton.textContent = currentAuthMode === 'login' ? 'Log In' : 'Sign Up';
+modalToggleText.textContent = currentAuthMode === 'login' ? 'Need an account?' : 'Already have an account?';
+modalToggleLinkText.textContent = currentAuthMode === 'login' ? 'Sign Up' : 'Log In';
+modalMessageBox.classList.add('hidden');
+if (currentAuthMode === 'login') {
+playerNameField.classList.add('hidden');
+forgotPasswordButton.classList.remove('hidden');
+} else {
+playerNameField.classList.remove('hidden');
+forgotPasswordButton.classList.add('hidden');
+}
+}
+window.handleEmailAuth = async function() {
+const email = modalEmail.value.trim();
+const password = modalPassword.value;
+const playerName = modalPlayerName.value.trim();
+if (!email || password.length < 6) {
+modalAlertMessage('Please enter a valid email and a password of at least 6 characters.', true);
+return;
+}
+modalAuthButton.disabled = true;
+try {
+if (currentAuthMode === 'login') {
+await signInWithEmailAndPassword(auth, email, password);
+modalAlertMessage('Login successful!', false);
+} else {
+if (playerName.length < 2) {
+modalAlertMessage('Please enter a **Player Name** of at least 2 characters.', true);
+modalAuthButton.disabled = false;
+return;
+}
+const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+await updateProfile(userCredential.user, {
+displayName: playerName
+});
+modalAlertMessage(`Account created successfully! Welcome, **${playerName}**!`, false);
+}
+closeAuthModal();
+} catch (error) {
+console.error("Auth Error:", error);
+let message = error.message.replace('Firebase: Error (auth/', '').replace(').', '').replace(/-/g, ' ');
+modalAlertMessage(`Authentication Failed: ${message}`, true);
+} finally {
+modalAuthButton.disabled = false;
+}
+}
+window.handleForgotPasswordPrompt = function() {
+const email = modalEmail.value.trim();
+if (!email) {
+modalAlertMessage("Please enter your email address above before clicking 'Forgot Password'.", true);
+return;
+}
+modalEmail.disabled = true;
+modalPassword.disabled = true;
+modalAuthButton.disabled = true;
+forgotPasswordButton.disabled = true;
+handleForgotPassword(email);
+}
+async function handleForgotPassword(email) {
+try {
+await sendPasswordResetEmail(auth, email);
+modalAlertMessage(`Password reset link sent to **${email}**. Check your inbox!`, false);
+} catch (error) {
+console.error("Password Reset Error:", error);
+let message = error.message.includes('user-not-found')
+? 'No account found with that email.'
+: error.message.replace('Firebase: Error (auth/', '').replace(').', '').replace(/-/g, ' ');
+modalAlertMessage(`Password Reset Failed: ${message}`, true);
+} finally {
+modalEmail.disabled = false;
+modalPassword.disabled = false;
+modalAuthButton.disabled = false;
+forgotPasswordButton.disabled = false;
+}
+}
+window.handleLogout = async function() {
+try {
+await signOut(auth);
+closeAuthModal();
+} catch (error) {
+console.error("Logout Error:", error);
+modalAlertMessage('Logout failed.', true);
+}
+}
+// --- Database Functions ---
+/**
+* Saves or updates the current builder maze as a private draft.
+*/
+async function saveDraft() {
+if (!db || !isEmailAuthenticated) {
+alertMessage("You must be logged in with an email account to save drafts.", true);
+return;
+}
+const name = mazeNameInput.value.trim();
+if (name.length < 3) {
+alertMessage("Please enter a name at least 3 characters long.", true);
+return;
+}
+const hasStart = builderMaze.some(row => row.includes(PLAYER_START));
+const hasGoal = builderMaze.some(row => row.includes(WINPAD));
+if (!hasStart) {
+alertMessage("Maze must contain a Player Start (Red) block.", true);
+return;
+}
+if (!hasGoal) {
+alertMessage("Maze must contain a Winpad (Blue) block.", true);
+return;
+}
+// Get and validate Fading Wall Cooldown
+let cooldown = parseInt(fadingWallCooldownInput.value);
+if (isNaN(cooldown) || cooldown < 500) {
+cooldown = 3000;
+alertMessage("Invalid cooldown, defaulting to 3000ms.", true);
+}
+try {
+const mazeDataString = JSON.stringify(builderMaze);
+const draftData = {
+name: name,
+map: mazeDataString,
+authorId: userId,
+author: auth.currentUser.displayName || auth.currentUser.email.split('@')[0] || userId.substring(0, 8),
+width: builderCols, // Use current dynamic builder dimensions
+height: builderRows, // Use current dynamic builder dimensions
+fadingWallCooldown: cooldown, // NEW: Save cooldown time
+updatedAt: new Date().toISOString()
+};
+const draftsCollection = collection(db, getDraftsPath(userId));
+if (isEditingDraftId) {
+// Update existing draft
+const draftRef = doc(draftsCollection, isEditingDraftId);
+await updateDoc(draftRef, draftData);
+alertMessage(`Draft "${name}" updated!`);
+} else {
+// Create new draft
+const docRef = await addDoc(draftsCollection, { ...draftData, createdAt: new Date().toISOString() });
+isEditingDraftId = docRef.id;
+alertMessage(`Draft "${name}" saved!`);
+}
+isEditingDraftName = name;
+loadMyDrafts(); // Refresh the drafts list
+} catch (e) {
+console.error("Error saving draft: ", e);
+alertMessage("Failed to save draft due to a database error.", true);
+}
+}
+// PublishMaze and Loading functions (Unmodified, but now use dynamic builderCols/Rows for Playtest/Draft)
+async function publishMaze() {
+if (!db || currentLevelSource !== 'draft' || !currentSourceDocId) return;
+if (!isEmailAuthenticated) {
+alertMessage("You must be logged in to publish levels.", true);
+return;
+}
+const name = isEditingDraftName || 'Unnamed Maze';
+try {
+const mazeDataString = JSON.stringify(maze); // Use the played maze data
+// 1. Save to Public Community Collection
+const docRef = await addDoc(collection(db, MAZES_COLLECTION_PATH), {
+name: name,
+map: mazeDataString,
+authorId: userId,
+author: auth.currentUser.displayName || auth.currentUser.email.split('@')[0] || userId.substring(0, 8),
+width: mazeCols,
+height: mazeRows,
+fadingWallCooldown: fadingWallCooldownMs, // NEW: Include cooldown in published data
+createdAt: new Date().toISOString(),
+publishedFrom: currentSourceDocId
+});
+// 2. Delete from Private Drafts
+const draftRef = doc(db, getDraftsPath(userId), currentSourceDocId);
+await deleteDoc(draftRef);
+alertMessage(`🎉 Maze "${name}" Published! It's now visible in the Community Hub!`);
+currentLevelSource = 'community';
+currentSourceDocId = null;
+isEditingDraftId = null;
+isEditingDraftName = '';
+gameControlsDefault.classList.remove('hidden');
+gameControlsPlaytest.classList.add('hidden');
+publishBtn.classList.add('hidden');
+loadCommunityLevels();
+loadMyDrafts();
+} catch (e) {
+console.error("Error publishing maze: ", e);
+alertMessage("Failed to publish maze due to a database error.", true);
+}
+}
+function loadCommunityLevels() {
+if (!db) {
+levelsListDiv.innerHTML = '<p class="text-center text-red-400">Database not connected.</p>';
+return;
+}
+levelsListDiv.innerHTML = '<p class="text-center text-gray-400">Loading community levels...</p>';
+try {
+const q = query(collection(db, MAZES_COLLECTION_PATH), limit(50));
+onSnapshot(q, (snapshot) => {
+levelsListDiv.innerHTML = '';
+if (snapshot.empty) {
+levelsListDiv.innerHTML = '<p class="text-center text-gray-400">No community levels found. Be the first to publish one!</p>';
+return;
+}
+snapshot.forEach((doc) => {
+const data = { id: doc.id, ...doc.data(), source: 'community' };
+const levelItem = createLevelListItem(data);
+levelsListDiv.appendChild(levelItem);
+});
+}, (error) => {
+console.error("Error listening to levels: ", error);
+levelsListDiv.innerHTML = `<p class="text-center text-red-400">Failed to load levels: ${error.message}</p>`;
+});
+} catch (error) {
+console.error("Error querying levels: ", error);
+}
+}
+function loadMyDrafts() {
+if (!db || !userId) {
+draftsStatus.textContent = "Database not ready.";
+return;
+}
+if (!isEmailAuthenticated) {
+draftsStatus.textContent = "Please Log In to view your private drafts.";
+draftsListDiv.innerHTML = `<p class="text-center text-gray-400">Please **Log In** to view your saved drafts. <button onclick="openAuthModal()" class="text-indigo-400 hover:underline">Click here to log in.</button></p>`;
+return;
+}
+draftsStatus.textContent = "Loading your private drafts...";
+draftsListDiv.innerHTML = '<p class="text-center text-gray-400">Loading drafts...</p>';
+try {
+const q = query(collection(db, getDraftsPath(userId)), limit(50));
+onSnapshot(q, (snapshot) => {
+draftsListDiv.innerHTML = '';
+if (snapshot.empty) {
+draftsStatus.textContent = "You have no saved drafts. Start building!";
+draftsListDiv.innerHTML = '<p class="text-center text-gray-400">You have no saved drafts.</p>';
+return;
+}
+snapshot.forEach((doc) => {
+const data = { id: doc.id, ...doc.data(), source: 'draft' };
+const levelItem = createLevelListItem(data);
+draftsListDiv.appendChild(levelItem);
+});
+draftsStatus.textContent = `Showing ${snapshot.size} drafts.`;
+}, (error) => {
+console.error("Error listening to drafts: ", error);
+draftsListDiv.innerHTML = `<p class="text-center text-red-400">Failed to load drafts: ${error.message}</p>`;
+});
+} catch (error) {
+console.error("Error querying drafts: ", error);
+}
+}
+function createLevelListItem(data) {
+const isDraft = data.source === 'draft';
+const levelItem = document.createElement('div');
+levelItem.className = 'level-item flex justify-between items-center';
+const title = isDraft ? `Draft: ${data.name}` : data.name;
+const authorDisplay = data.author;
+const cooldownText = data.fadingWallCooldown ? ` | Fade: ${data.fadingWallCooldown/1000}s` : '';
+levelItem.innerHTML = `
+<div>
+<p class="font-bold text-green-300">${title}</p>
+<p class="text-xs text-gray-400">By ${authorDisplay} | Size: ${data.width}x${data.height}${cooldownText}</p>
+</div>
+<button class="text-sm px-3 py-1 rounded-md ${isDraft ? 'bg-purple-500 hover:bg-purple-400' : 'bg-green-500 hover:bg-green-400'} text-white">
+${isDraft ? 'Load Editor' : 'Play'}
+</button>
+`;
+levelItem.onclick = () => {
+if (isDraft) {
+if (!isEmailAuthenticated || userId !== data.authorId) {
+alertMessage("You can only edit your own saved drafts. Please log in with the correct account.", true);
+return;
+}
+loadDraftToBuilder(data);
+} else {
+loadCustomMaze(data.map, data.width, data.height, data.name, data.fadingWallCooldown, data.id, 'community');
+}
+};
+return levelItem;
+}
+// --- Maze Loading & Game Start ---
+function resetPlayerState() {
+player.x = playerStart.x;
+player.y = playerStart.y;
+playerHealth = MAX_HEALTH;
+isGameOver = false;
+clearFadingWallTimers(); // NEW: Clear active timers
+updateHealthDisplay();
+}
+/**
+* Loads a draft's data directly into the maze builder, updating the builder size and cooldown.
+*/
+function loadDraftToBuilder(data) {
+try {
+const map = JSON.parse(data.map);
+// Set the builder dimensions to the draft's dimensions
+builderCols = data.width;
+builderRows = data.height;
+builderWidthInput.value = builderCols;
+builderHeightInput.value = builderRows;
+// Set the cooldown value
+fadingWallCooldownMs = data.fadingWallCooldown || 3000;
+fadingWallCooldownInput.value = fadingWallCooldownMs;
+// Update canvas size and reinitialize grid if dimensions changed
+updateBuilderCanvasSize();
+// Load map into builder
+builderMaze = map;
+isEditingDraftId = data.id;
+isEditingDraftName = data.name;
+mazeNameInput.value = data.name;
+showCommunityContent('builder');
+drawBuilder();
+alertMessage(`Draft "${data.name}" loaded for editing. Size: ${builderCols}x${builderRows}`);
+} catch (e) {
+console.error("Error loading draft to builder:", e);
+alertMessage("Failed to load draft data. Initializing new grid.", true);
+initializeBuilder(15, 15); // Fallback to 15x15
+}
+}
+/**
+* Generates a new random maze (Carved Path) and starts the game.
+*/
+function generateCarvedMaze() {
+currentLevelSource = 'random';
+currentSourceDocId = null;
+let width = parseInt(randomMazeWidthInput.value);
+let height = parseInt(randomMazeHeightInput.value);
+// Carved mazes need odd dimensions and min 5x5
+width = clamp(width, 5, 1001);
+height = clamp(height, 5, 1001);
+mazeCols = width % 2 === 0 ? width + 1 : width;
+mazeRows = height % 2 === 0 ? height + 1 : height;
+// If the user specified an even number near the max, it will clamp to the max odd.
+mazeCols = clamp(mazeCols, 5, 1001);
+mazeRows = clamp(mazeRows, 5, 1001);
+let tempMaze = Array.from({ length: mazeRows }, () => Array.from({ length: mazeCols }, () => WALL));
+const stack = [[1, 1]];
+const directions = [ [0, -2], [0, 2], [-2, 0], [2, 0] ];
+while (stack.length > 0) {
+const [r, c] = stack[stack.length - 1];
+if (tempMaze[r][c] === WALL) tempMaze[r][c] = PATH;
+directions.sort(() => Math.random() - 0.5);
+let foundNeighbor = false;
+for (const [dr, dc] of directions) {
+const nextR = r + dr;
+const nextC = c + dc;
+if (nextR > 0 && nextR < mazeRows - 1 && nextC > 0 && nextC < mazeCols - 1 && tempMaze[nextR][nextC] === WALL) {
+tempMaze[r + dr / 2][c + dc / 2] = PATH;
+stack.push([nextR, nextC]);
+foundNeighbor = true;
+break;
+}
+}
+if (!foundNeighbor) stack.pop();
+}
+maze = tempMaze;
+playerStart = { x: 1, y: 1 };
+finish = { x: mazeCols - 2, y: mazeRows - 2 };
+fadingWallCooldownMs = 0; // Random mazes don't use fading walls
+resetPlayerState();
+updateLevelNameDisplay(`Carved ${mazeCols}x${mazeRows}`);
+showScreen('gameScreen');
+drawGame();
+startGameLoop();
+}
+/**
+* Generates a new random maze with random block placement (not carved).
+*/
+function generateRandomBlockMaze() {
+currentLevelSource = 'random_blocks';
+currentSourceDocId = null;
+mazeCols = clamp(parseInt(randomMazeWidthInput.value), 5, 1000);
+mazeRows = clamp(parseInt(randomMazeHeightInput.value), 5, 1000);
+let tempMaze = Array.from({ length: mazeRows }, () => Array.from({ length: mazeCols }, () => PATH));
+// 1. Set outer walls (1)
+for (let i = 0; i < mazeCols; i++) {
+tempMaze[0][i] = WALL; // Top
+tempMaze[mazeRows - 1][i] = WALL; // Bottom
+}
+for (let i = 0; i < mazeRows; i++) {
+tempMaze[i][0] = WALL; // Left
+tempMaze[i][mazeCols - 1] = WALL; // Right
+}
+// 2. Randomly place walls (1), damage blocks (4) and paths (0) inside
+for (let r = 1; r < mazeRows - 1; r++) {
+for (let c = 1; c < mazeCols - 1; c++) {
+const rand = Math.random();
+if (rand < 0.3) {
+tempMaze[r][c] = WALL; // 30% Wall
+} else if (rand < 0.35) {
+tempMaze[r][c] = DAMAGE; // 5% Damage Block
+} else {
+tempMaze[r][c] = PATH; // Path
+}
+}
+}
+// 3. Set Start and Finish (guaranteed path, 0)
+playerStart = { x: 1, y: 1 };
+finish = { x: mazeCols - 2, y: mazeRows - 2 };
+tempMaze[playerStart.y][playerStart.x] = PATH;
+tempMaze[finish.y][finish.x] = WINPAD;
+maze = tempMaze;
+fadingWallCooldownMs = 0; // Random mazes don't use fading walls
+resetPlayerState();
+updateLevelNameDisplay(`Random Block ${mazeCols}x${mazeRows}`);
+showScreen('gameScreen');
+drawGame();
+startGameLoop();
+}
+function loadCustomMaze(mapDataString, width, height, name, cooldown, id, source) {
+try {
+const map = JSON.parse(mapDataString);
+let startR = -1, startC = -1;
+let foundStart = false;
+for (let r = 0; r < height; r++) {
+for (let c = 0; c < width; c++) {
+if (map[r][c] === PLAYER_START) {
+startR = r;
+startC = c;
+foundStart = true;
+break;
+}
+}
+if (foundStart) break;
+}
+if (!foundStart) {
+console.error("No Player Start found. Defaulting to (1,1).");
+startR = 1;
+startC = 1;
+}
+maze = map;
+mazeCols = width;
+mazeRows = height;
+playerStart = { x: startC, y: startR };
+finish = { x: 0, y: 0 };
+fadingWallCooldownMs = cooldown || 3000; // Load cooldown or default
+resetPlayerState();
+currentLevelSource = source;
+currentSourceDocId = id;
+isEditingDraftName = name;
+gameCanvas.width = VIEWPORT_WIDTH;
+gameCanvas.height = VIEWPORT_HEIGHT;
+updateLevelNameDisplay(name);
+statusMessage.textContent = `Playing ${source === 'draft' || source === 'playtest' ? 'Your Draft' : 'Community Level'}: ${name}!`;
+publishBtn.classList.add('hidden');
+showScreen('gameScreen');
+drawGame();
+startGameLoop();
+} catch (e) {
+console.error("Error loading custom maze:", e);
+alertMessage("Failed to load custom maze data.", true);
+}
+}
+function startPlaytest() {
+const hasStart = builderMaze.some(row => row.includes(PLAYER_START));
+const hasGoal = builderMaze.some(row => row.includes(WINPAD));
+if (!hasStart) {
+alertMessage("Playtest failed: Maze must contain a Player Start (Red) block.", true);
+return;
+}
+if (!hasGoal) {
+alertMessage("Playtest failed: Maze must contain a Winpad (Blue) block.", true);
+return;
+}
+// Read and validate cooldown for playtest
+let cooldown = parseInt(fadingWallCooldownInput.value);
+if (isNaN(cooldown) || cooldown < 500) {
+cooldown = 3000;
+alertMessage("Invalid cooldown for playtest, defaulting to 3000ms.", true);
+}
+const mapDataString = JSON.stringify(builderMaze);
+const source = isEditingDraftId ? 'draft' : 'playtest';
+loadCustomMaze(mapDataString, builderCols, builderRows, mazeNameInput.value || 'Untitled Draft', cooldown, isEditingDraftId, source);
+}
+function exitPlaytest() {
+currentLevelSource = 'none';
+currentSourceDocId = null;
+isGameOver = false;
+stopGameLoop();
+showScreen('communityScreen');
+showCommunityContent('builder');
+}
+function resetGame() {
+if (isGameOver) {
+statusMessage.textContent = "Game reset. Good luck!";
+}
+resetPlayerState();
+drawGame();
+startGameLoop();
+}
+// --- Game Loop and Drawing ---
+function updateCamera() {
+const fullMazeWidth = mazeCols * BLOCK_SIZE;
+const fullMazeHeight = mazeRows * BLOCK_SIZE;
+const targetX = player.x * BLOCK_SIZE + BLOCK_SIZE / 2 - VIEWPORT_WIDTH / 2;
+const targetY = player.y * BLOCK_SIZE + BLOCK_SIZE / 2 - VIEWPORT_HEIGHT / 2;
+const maxX = fullMazeWidth > VIEWPORT_WIDTH ? fullMazeWidth - VIEWPORT_WIDTH : 0;
+const maxY = fullMazeHeight > VIEWPORT_HEIGHT ? fullMazeHeight - VIEWPORT_HEIGHT : 0;
+cameraX = clamp(targetX, 0, maxX);
+cameraY = clamp(targetY, 0, maxY);
+}
+function drawGame() {
+if (!maze || maze.length === 0 || gameScreen.classList.contains('hidden')) return;
+gameCanvas.width = VIEWPORT_WIDTH;
+gameCanvas.height = VIEWPORT_HEIGHT;
+gameCtx.fillStyle = '#161b22';
+gameCtx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+updateCamera();
+const isRandomMaze = currentLevelSource === 'random';
+for (let r = 0; r < mazeRows; r++) {
+for (let c = 0; c < mazeCols; c++) {
+const drawX = c * BLOCK_SIZE - cameraX;
+const drawY = r * BLOCK_SIZE - cameraY;
+if (drawX + BLOCK_SIZE > 0 && drawX < VIEWPORT_WIDTH &&
+drawY + BLOCK_SIZE > 0 && drawY < VIEWPORT_HEIGHT) {
+const cellValue = maze[r][c];
+let color = null;
+if (cellValue === WALL) {
+color = wallColor;
+}
+else if (cellValue === WINPAD || (isRandomMaze && r === finish.y && c === finish.x)) {
+color = goalColor;
+if (player.x === c && player.y === r && isGameOver) {
+color = winColor;
+}
+}
+else if (cellValue === DAMAGE) {
+color = damageColor;
+}
+else if (cellValue === FADING_WALL_SOLID) {
+color = fadingWallColor;
+}
+else if (cellValue === FADING_WALL_FADED) {
+// Faded walls render as path with a semi-transparent white box to show cooldown
+color = 'rgba(255, 255, 255, 0.2)';
+}
+if (color) {
+gameCtx.fillStyle = color;
+gameCtx.fillRect(drawX, drawY, BLOCK_SIZE, BLOCK_SIZE);
+}
+// Path tiles around start/end for visual clarity in non-random levels
+if (cellValue === PLAYER_START && (player.x !== c || player.y !== r)) {
+gameCtx.fillStyle = '#1f2937';
+gameCtx.fillRect(drawX, drawY, BLOCK_SIZE, BLOCK_SIZE);
+}
+}
+}
+}
+// Draw Player
+gameCtx.fillStyle = playerColor;
+gameCtx.fillRect( player.x * BLOCK_SIZE - cameraX, player.y * BLOCK_SIZE - cameraY, BLOCK_SIZE, BLOCK_SIZE );
+// Draw Game Over overlay
+if (isGameOver && playerHealth === 0) {
+gameCtx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+gameCtx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+gameCtx.fillStyle = 'white';
+gameCtx.font = 'bold 48px Inter';
+gameCtx.textAlign = 'center';
+gameCtx.fillText("GAME OVER", VIEWPORT_WIDTH / 2, VIEWPORT_HEIGHT / 2);
+stopGameLoop(); // Stop loop on Game Over
+}
+}
+/**
+* Initiates the fading wall timer and visual update.
+*/
+function startFadingWallTimer(r, c) {
+// 1. Change the block state to FADED (path)
+maze[r][c] = FADING_WALL_FADED;
+// 2. Start the timer to revert it to SOLID
+const timerId = setTimeout(() => {
+if (maze[r][c] === FADING_WALL_FADED) {
+maze[r][c] = FADING_WALL_SOLID;
+drawGame(); // Redraw once the block is solid again
+}
+// Remove this timer from the tracking array
+fadingWallTimers = fadingWallTimers.filter(t => t.timerId !== timerId);
+}, fadingWallCooldownMs);
+// 3. Track the active timer
+fadingWallTimers.push({ r, c, timerId });
+alertMessage(`Fading Wall at (${c}, ${r}) opened for ${fadingWallCooldownMs / 1000} seconds!`);
+}
+function tryMove(dx, dy) {
+if (isGameOver || gameScreen.classList.contains('hidden')) return;
+const newX = player.x + dx;
+const newY = player.y + dy;
+if (newX < 0 || newX >= mazeCols || newY < 0 || newY >= mazeRows) return;
+const nextCell = maze[newY][newX];
+// Handle Fading Wall interaction (before checking if it's a solid wall)
+if (nextCell === FADING_WALL_SOLID) {
+// Hitting a solid fading wall opens it, but prevents movement in this tick
+startFadingWallTimer(newY, newX);
+drawGame();
+return; // Prevent movement onto a solid wall
+}
+// Check for standard Wall or Damage Wall
+if (nextCell === WALL) return;
+player.x = newX;
+player.y = newY;
+if (nextCell === DAMAGE) {
+playerHealth -= 1;
+if (playerHealth <= 0) {
+playerHealth = 0;
+isGameOver = true;
+statusMessage.textContent = '❌ GAME OVER! Your health reached 0. Press Exit to Menu.';
+stopGameLoop();
+} else {
+alertMessage(`Ouch! -1 Health from damage block! Health remaining: ${playerHealth}.`);
+}
+updateHealthDisplay();
+}
+let won = false;
+if (!isGameOver) {
+    const isRandomMaze = currentLevelSource === 'random';
+    
+    if (isRandomMaze) {
+        if (player.x === finish.x && player.y === finish.y) {
+            won = true;
+        }
+    } else {
+        if (nextCell === WINPAD) {
+            won = true;
+        }
+    }
+}
+if (won) {
+isGameOver = true;
+playerHealth = MAX_HEALTH;
+updateHealthDisplay();
+stopGameLoop();
+if (currentLevelSource === 'draft' || currentLevelSource === 'playtest') {
+statusMessage.textContent = `🏆 MAZE BEATEN! You are ready to publish.`;
+publishBtn.classList.remove('hidden');
+} else {
+statusMessage.textContent = '🏆 YOU WIN! Level cleared!';
+}
+}
+drawGame();
+}
+window.movePlayer = function(dx, dy) {
+tryMove(dx, dy);
+}
+document.addEventListener('keydown', (e) => {
+let dx = 0;
+let dy = 0;
+if (gameScreen.classList.contains('hidden')) return;
+switch (e.key) {
+case 'ArrowUp': case 'w': case 'W': dy = -1; break;
+case 'ArrowDown': case 's': case 'S': dy = 1; break;
+case 'ArrowLeft': case 'a': case 'A': dx = -1; break;
+case 'ArrowRight': case 'd': case 'D': dx = 1; break;
+default: return;
+}
+e.preventDefault();
+tryMove(dx, dy);
+});
+// --- Maze Builder Logic ---
+/**
+* Resizes the builder canvas and updates the builder dimensions based on inputs.
+*/
+function updateBuilderSize() {
+let newCols = parseInt(builderWidthInput.value);
+let newRows = parseInt(builderHeightInput.value);
+newCols = clamp(newCols, MIN_BUILDER_DIM, MAX_BUILDER_DIM);
+newRows = clamp(newRows, MIN_BUILDER_DIM, MAX_BUILDER_DIM);
+if (builderCols === newCols && builderRows === newRows) {
+alertMessage("Grid size is already set to these dimensions.");
+return;
+}
+builderCols = newCols;
+builderRows = newRows;
+builderWidthInput.value = builderCols;
+builderHeightInput.value = builderRows;
+initializeBuilder(builderCols, builderRows);
+alertMessage(`Builder grid resized to ${builderCols}x${builderRows}. Content reset.`);
+}
+/**
+* Updates the canvas dimensions to match the current builderCols/Rows.
+*/
+function updateBuilderCanvasSize() {
+builderCanvas.width = builderCols * BUILDER_BLOCK_SIZE;
+builderCanvas.height = builderRows * BUILDER_BLOCK_SIZE;
+}
+/**
+* Initializes the builder grid to a path (0) with a Wall (1) border,
+* and resets all draft editing state.
+*/
+function initializeBuilder(cols = builderCols, rows = builderRows) {
+// Update current dimensions
+builderCols = cols;
+builderRows = rows;
+// Clear all editing state
+isEditingDraftId = null;
+isEditingDraftName = '';
+mazeNameInput.value = '';
+updateBuilderCanvasSize(); // Update canvas size
+// Start with all paths (0) for the inner area
+builderMaze = Array.from({ length: builderRows }, () =>
+Array.from({ length: builderCols }, () => PATH)
+);
+// Set borders to Wall (1) for the fixed boundary
+for (let i = 0; i < builderCols; i++) {
+builderMaze[0][i] = WALL; // Top border
+builderMaze[builderRows - 1][i] = WALL; // Bottom border
+}
+for (let i = 0; i < builderRows; i++) {
+builderMaze[i][0] = WALL; // Left border
+builderMaze[i][builderCols - 1] = WALL; // Right border
+}
+// Set default Player Start and Winpad in the inner area (only if big enough)
+if (builderCols > 2 && builderRows > 2) {
+builderMaze[1][1] = PLAYER_START;
+builderMaze[builderRows - 2][builderCols - 2] = WINPAD;
+}
+drawBuilder();
+}
+/**
+* Draws the builder grid.
+*/
+function drawBuilder() {
+if (!builderMaze || !isBuilding) return;
+builderCtx.fillStyle = '#161b22';
+builderCtx.fillRect(0, 0, builderCanvas.width, builderCanvas.height);
+for (let r = 0; r < builderRows; r++) {
+for (let c = 0; c < builderCols; c++) {
+const drawX = c * BUILDER_BLOCK_SIZE;
+const drawY = r * BUILDER_BLOCK_SIZE;
+let color;
+const cellValue = builderMaze[r][c];
+if (cellValue === WALL) {
+color = wallColor;
+}
+else if (cellValue === PLAYER_START) {
+color = playerColor;
+}
+else if (cellValue === WINPAD) {
+color = goalColor;
+}
+else if (cellValue === DAMAGE) {
+color = damageColor;
+}
+else if (cellValue === FADING_WALL_SOLID) { // NEW: Solid Fading Wall
+color = fadingWallColor;
+}
+else {
+color = '#161b22'; // Path
+}
+builderCtx.fillStyle = color;
+builderCtx.fillRect(drawX, drawY, BUILDER_BLOCK_SIZE, BUILDER_BLOCK_SIZE);
+builderCtx.strokeStyle = '#30363d';
+builderCtx.strokeRect(drawX, drawY, BUILDER_BLOCK_SIZE, BUILDER_BLOCK_SIZE);
+}
+}
+}
+/**
+* Handles the continuous action of building/erasing blocks.
+*/
+function handleBuilderAction(event) {
+const rect = builderCanvas.getBoundingClientRect();
+let x, y;
+if (event.touches && event.touches.length > 0) {
+const touch = event.touches[0];
+x = touch.clientX - rect.left;
+y = touch.clientY - rect.top;
+} else {
+x = event.clientX - rect.left;
+y = event.clientY - rect.top;
+}
+const c = Math.floor(x / BUILDER_BLOCK_SIZE);
+const r = Math.floor(y / BUILDER_BLOCK_SIZE);
+if (r < 0 || r >= builderRows || c < 0 || c >= builderCols) return;
+const isBoundary = r === 0 || r === builderRows - 1 || c === 0 || c === builderCols - 1;
+if (isBoundary) {
+builderMaze[r][c] = WALL;
+} else {
+let newValue;
+switch (currentTool) {
+case 'wall':
+newValue = WALL;
+break;
+case 'player':
+newValue = PLAYER_START;
+break;
+case 'winpad':
+newValue = WINPAD;
+break;
+case 'damage':
+newValue = DAMAGE;
+break;
+case 'fadingwall': // NEW Fading Wall
+newValue = FADING_WALL_SOLID;
+break;
+case 'erase':
+newValue = PATH;
+break;
+default: return;
+}
+// Logic to ensure only one Player Start (2) and one Winpad (3) exists
+if (newValue === PLAYER_START) {
+for (let row of builderMaze) {
+const playerIndex = row.indexOf(PLAYER_START);
+if (playerIndex !== -1) row[playerIndex] = PATH;
+}
+} else if (newValue === WINPAD) {
+for (let row of builderMaze) {
+const winpadIndex = row.indexOf(WINPAD);
+if (winpadIndex !== -1) row[winpadIndex] = PATH;
+}
+}
+builderMaze[r][c] = newValue;
+}
+drawBuilder();
+}
+// --- Event Listeners and Screen Management ---
+/**
+* Shows a specific screen and hides all others.
+*/
+function showScreen(screenId) {
+startScreen.classList.add('hidden');
+randomConfigScreen.classList.add('hidden');
+colorCustomizeScreen.classList.add('hidden');
+gameScreen.classList.add('hidden');
+communityScreen.classList.add('hidden');
+publishBtn.classList.add('hidden');
+stopGameLoop(); // Stop game loop if leaving game screen
+if (screenId !== 'communityScreen' && !communityScreen.classList.contains('hidden') && isBuilding) {
+initializeBuilder(15, 15); // Reset builder size to default on exit
+isBuilding = false;
+alertMessage("Draft changes discarded. Returned to main menu.");
+}
+isBuilding = false;
+if (screenId === 'startScreen') {
+currentLevelSource = 'none';
+startScreen.classList.remove('hidden');
+} else if (screenId === 'randomConfigScreen') { // New Screen
+randomConfigScreen.classList.remove('hidden');
+} else if (screenId === 'colorCustomizeScreen') {
+colorCustomizeScreen.classList.remove('hidden');
+} else if (screenId === 'gameScreen') {
+gameScreen.classList.remove('hidden');
+const isTestMode = currentLevelSource === 'draft' || currentLevelSource === 'playtest';
+gameControlsDefault.classList.toggle('hidden', isTestMode);
+gameControlsPlaytest.classList.toggle('hidden', !isTestMode);
+if (isTestMode) {
+statusMessage.textContent = `[PLAYTEST MODE] Cooldown: ${fadingWallCooldownMs / 1000}s. Test your design!`;
+} else if (currentLevelSource === 'community') {
+statusMessage.textContent = `Playing community level.`;
+} else if (currentLevelSource === 'random' || currentLevelSource === 'random_blocks') {
+statusMessage.textContent = `Use **Arrow Keys** to move the red player block. Find the **Blue** goal!`;
+}
+} else if (screenId === 'communityScreen') {
+communityScreen.classList.remove('hidden');
+if (!mazeBuilderSection.classList.contains('hidden')) showCommunityContent('builder');
+else if (!levelsListSection.classList.contains('hidden')) showCommunityContent('levels');
+else if (!leaderboardsSection.classList.contains('hidden')) showCommunityContent('leaderboards');
+else showCommunityContent('drafts');
+}
+if (screenId !== 'gameScreen' && currentLevelSource !== 'none') {
+resetPlayerState();
+currentLevelSource = 'none';
+}
+}
+function showCommunityContent(content) {
+mazeBuilderSection.classList.add('hidden');
+levelsListSection.classList.add('hidden');
+draftsListSection.classList.add('hidden');
+leaderboardsSection.classList.add('hidden');
+showBuilderBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+showLevelsBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+showDraftsBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+showLeaderboardsBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+const wasBuilding = isBuilding;
+isBuilding = false;
+if (wasBuilding && content !== 'builder') {
+initializeBuilder(15, 15);
+}
+if (content === 'builder') {
+mazeBuilderSection.classList.remove('hidden');
+showBuilderBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+isBuilding = true;
+// Ensure inputs reflect current builder state
+builderWidthInput.value = builderCols;
+builderHeightInput.value = builderRows;
+fadingWallCooldownInput.value = fadingWallCooldownMs; // Set cooldown input
+if (builderMaze.length === 0) initializeBuilder();
+drawBuilder();
+} else if (content === 'levels') {
+levelsListSection.classList.remove('hidden');
+showLevelsBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+if (userId) loadCommunityLevels();
+} else if (content === 'drafts') {
+draftsListSection.classList.remove('hidden');
+showDraftsBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+if (userId) loadMyDrafts();
+} else if (content === 'leaderboards') {
+leaderboardsSection.classList.remove('hidden');
+showLeaderboardsBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+}
+}
+function switchTool(tool) {
+currentTool = tool;
+document.querySelectorAll('.tool-btn').forEach(btn => {
+if (btn.dataset.tool === tool) {
+btn.classList.add('active');
+} else {
+btn.classList.remove('active');
+}
+});
+}
+// --- Button Bindings ---
+// Main Menu Buttons
+authBtn.addEventListener('click', openAuthModal);
+playOfficialBtn.addEventListener('click', () => alertMessage("Official Levels are coming soon! An admin (LtpMer) will set them up.", false));
+customizeColorsBtn.addEventListener('click', () => {
+playerColorInput.value = playerColor;
+wallColorInput.value = wallColor;
+goalColorInput.value = goalColor;
+winColorInput.value = winColor;
+damageColorInput.value = damageColor;
+fadingWallColorInput.value = fadingWallColor;
+showScreen('colorCustomizeScreen');
+});
+communityBtn.addEventListener('click', () => { showScreen('communityScreen'); });
+// NEW Random Config Button
+configRandomMazeBtn.addEventListener('click', () => { showScreen('randomConfigScreen'); });
+// Random Config Screen Buttons
+startCarvedMazeBtn.addEventListener('click', generateCarvedMaze);
+startRandomBlockBtn.addEventListener('click', generateRandomBlockMaze);
+backToStartFromRandomBtn.addEventListener('click', () => { showScreen('startScreen'); });
+// Customize Colors Screen buttons
+saveColorsBtn.addEventListener('click', () => {
+playerColor = playerColorInput.value;
+wallColor = wallColorInput.value;
+goalColor = goalColorInput.value;
+winColor = winColorInput.value;
+damageColor = damageColorInput.value;
+fadingWallColor = fadingWallColorInput.value;
+showScreen('startScreen');
+if (!gameScreen.classList.contains('hidden')) drawGame();
+drawBuilder();
+});
+// Game Screen buttons
+newMazeBtn.addEventListener('click', () => { showScreen('randomConfigScreen'); }); // Changed to config screen
+exitGameBtn.addEventListener('click', () => { showScreen('startScreen'); });
+publishBtn.addEventListener('click', publishMaze);
+resetPlaytestBtn.addEventListener('click', resetGame);
+// Community Screen buttons
+backToStartFromCommunityBtn.addEventListener('click', () => {
+if (!mazeBuilderSection.classList.contains('hidden')) {
+initializeBuilder(15, 15);
+alertMessage("Draft changes discarded. Returned to main menu.");
+}
+showScreen('startScreen');
+});
+showBuilderBtn.addEventListener('click', () => showCommunityContent('builder'));
+showLevelsBtn.addEventListener('click', () => showCommunityContent('levels'));
+showDraftsBtn.addEventListener('click', () => showCommunityContent('drafts'));
+showLeaderboardsBtn.addEventListener('click', () => showCommunityContent('leaderboards'));
+// Maze Builder Buttons
+resizeBuilderBtn.addEventListener('click', updateBuilderSize); // New Resize button listener
+clearBuilderBtn.addEventListener('click', () => initializeBuilder(builderCols, builderRows));
+saveDraftBtn.addEventListener('click', saveDraft);
+playtestMazeBtn.addEventListener('click', startPlaytest);
+backToBuilderBtn.addEventListener('click', exitPlaytest);
+// Tool selection event listeners
+builderToolsDiv.addEventListener('click', (e) => {
+const toolButton = e.target.closest('.tool-btn');
+if (toolButton && toolButton.dataset.tool) {
+switchTool(toolButton.dataset.tool);
+}
+});
+// --- Drag-to-Draw Event Listeners ---
+builderCanvas.addEventListener('mousedown', (e) => {
+if (!isBuilding) return;
+isDrawing = true;
+handleBuilderAction(e);
+});
+builderCanvas.addEventListener('mousemove', (e) => {
+if (isBuilding && isDrawing) {
+handleBuilderAction(e);
+}
+});
+document.addEventListener('mouseup', () => {
+isDrawing = false;
+});
+builderCanvas.addEventListener('touchstart', (e) => {
+if (!isBuilding) return;
+isDrawing = true;
+e.preventDefault();
+handleBuilderAction(e);
+}, { passive: false });
+builderCanvas.addEventListener('touchmove', (e) => {
+if (isBuilding && isDrawing) {
+e.preventDefault();
+handleBuilderAction(e);
+}
+}, { passive: false });
+builderCanvas.addEventListener('touchend', () => {
+isDrawing = false;
+});
+// Initial setup: show the start screen and initialize Firebase
+window.onload = function() {
+gameCanvas.width = VIEWPORT_WIDTH;
+gameCanvas.height = VIEWPORT_HEIGHT;
+initializeFirebase();
+initializeBuilder(15, 15); // Initialize builder grid to default 15x15
+switchTool('wall');
+toggleAuthMode('login');
+updateHealthDisplay();
+}
 </script>
 </body>
+</html></title>
+</head>
 </html>
